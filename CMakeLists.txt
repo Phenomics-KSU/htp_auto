@@ -4,7 +4,16 @@ project(htp_auto)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp)
+find_package(catkin REQUIRED 
+  COMPONENTS
+  roscpp
+  actionlib
+  message_generation
+  std_msgs
+  actionlib_msgs
+  tf
+)
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -41,24 +50,23 @@ find_package(catkin REQUIRED COMPONENTS roscpp)
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+  FILES
+  PID.srv
+)
 
 ## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
+add_action_files(
+  FILES
+  WaypointGuidance.action
+)
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  actionlib_msgs
+  std_msgs
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -72,7 +80,7 @@ find_package(catkin REQUIRED COMPONENTS roscpp)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES htp_auto
-#  CATKIN_DEPENDS other_catkin_pkg
+  CATKIN_DEPENDS message_runtime actionlib_msgs
 #  DEPENDS system_lib
 )
 
@@ -82,7 +90,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
+include_directories(include)
 
 ## Declare a cpp library
 # add_library(htp_auto
@@ -90,14 +98,20 @@ catkin_package(
 # )
 
 ## Declare a cpp executable
-add_executable(hello src/hello.cpp)
+add_executable(waypoint_guidance src/waypoint_guidance.cpp)
+add_executable(pid src/pid.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(htp_auto_node htp_auto_generate_messages_cpp)
+add_dependencies(waypoint_guidance htp_auto_generate_messages_cpp)
+add_dependencies(pid htp_auto_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(hello
+target_link_libraries(waypoint_guidance
+   ${catkin_LIBRARIES}
+)
+
+target_link_libraries(pid
    ${catkin_LIBRARIES}
 )
 
