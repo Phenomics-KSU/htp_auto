@@ -18,7 +18,7 @@
 #include <tf/transform_broadcaster.h>
 
 // ROS Topic Headers
-#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <htp_auto/WaypointGuidanceAction.h>
 #include <htp_auto/PID.h>
@@ -132,8 +132,7 @@ public: // methods
 
         distance_remaining_ = sqrt(path[0]*path[0] + path[1]*path[1]);
         
-        // Need to switch sign since positive heading is counter-clockwise.
-        desired_heading_ = -1.0 * atan2(path[0], path[1]);
+        desired_heading_ = atan2(path[1], path[0]);
 
         switch (state_)
         {
@@ -288,11 +287,12 @@ private: // methods
     
     void setPIDValues()
     {  
-        heading_pid_.request.kp = 1;
+        heading_pid_.request.kp = .2;
         heading_pid_.request.ki = 0;
         heading_pid_.request.kd = 0;
         heading_pid_.request.current_val = 0;
         heading_pid_.request.target_val = 0;
+        //heading_pid_.request.max_output = 0.5;
         heading_pid_.request.previous_error = 0;
         heading_pid_.request.previous_integrator_val = 0;
         heading_pid_.request.integral_term_min = -100;
@@ -382,16 +382,17 @@ public: // methods
         server_.start();
     }
 
-    void poseMessageReceived(const geometry_msgs::Pose & message)
+    void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped & message)
     {
         if (server_.isActive() && !reached_target_)
         {
             // We have an accepted goal that's still being processed.
             // Run waypoint guidance to get velocity commands, then publish them.
+            geometry_msgs::Pose const & pose = message.pose.pose;
             double linear_velocity = 0;
             double angular_velocity = 0;
-            double position[2] = {message.position.x, message.position.y};
-            double heading = tf::getYaw(message.orientation);
+            double position[2] = {pose.position.x, pose.position.y};
+            double heading = tf::getYaw(pose.orientation);
            
             reached_target_ = guidance_.update(position, heading, linear_velocity, angular_velocity);
             
@@ -400,6 +401,9 @@ public: // methods
             velocity_message.angular.z = angular_velocity;
 
             velocity_publisher_.publish(velocity_message);
+
+            // Temporary. Just for debugging.
+            ROS_INFO_THROTTLE(2, "Guide: (%.3lf, %.3lf, %.1lf)", position[0], position[1], heading * 180 / M_PI);  
         }
     }
 
@@ -409,7 +413,10 @@ public: // methods
     	double target[2] = { goal->target_x, goal->target_y };
         guidance_.setTarget(target, goal->stop_at_target);
         guidance_.setAcceptanceRadius(goal->acceptance_radius);
-        server_.acceptNewGoal();
+
+        // This call generates an error of "Cannot accept next goal when new goal is not available".
+        // Seems that the goal is automatically accepted using the execute callback method.
+        //server_.acceptNewGoal();
             
         // Reset flag so we don't instantly complete goal.
         reached_target_ = false;
@@ -458,7 +465,7 @@ private: // fields
     // Action server that accepts goals and provides feedback.
     actionlib::SimpleActionServer<htp_auto::WaypointGuidanceAction> server_; 
     
-    // Feedback data to send periodically.
+    // Feedback data to send periodically to client.
     htp_auto::WaypointGuidanceFeedback feedback_;
     
     // Logic to convert pose to angular velocities.
@@ -492,6 +499,14 @@ int main(int argc, char **argv)
     
     // TODO: make this configurable
     double travel_velocity = .5;
+
+    // Heading PID service name
+    std::string pid_srv_name = "pid";
+
+    while (!ros::service::waitForService(pid_srv_name, 2000))
+    {
+        ROS_ERROR_STREAM("Cannot connect to heading PID service: " << pid_srv_name);
+    }
     
     ros::ServiceClient heading_pid_client = nh.serviceClient<htp_auto::PID>("pid");
     
