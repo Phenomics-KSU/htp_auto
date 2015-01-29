@@ -1,0 +1,18 @@
+First to find what services are available (after starting nodes):
+rosservice list
+
+Then to call a service:
+rosservice call service_name -- args
+
+To find out what arguments a service takes:
+rosservice type service_name
+then
+rossrv show type_name (where type name was returned from 1st command)
+
+For example to change current mission index to 2:
+rosservice call /set_mission_index -- 2
+
+Or to add command to mission:
+rosservice call /add_mission_item -- '[0, 0, 400, 0, 0, 0, 1, 0, 0]'
+
+

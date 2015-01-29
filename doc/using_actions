@@ -1,0 +1,8 @@
+The easy way to use actions is using an auto-generated GUI.
+rosrun actionlib axclient.py action_server_name
+
+So for example to use action server (after starting it):
+rosrun actionlib axclient.py /guidance
+
+
+
