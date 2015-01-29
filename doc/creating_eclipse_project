@@ -1,0 +1,19 @@
+Summarized from http://wiki.ros.org/IDEs
+
+1) Go to workspace root directory (/ros)
+2) run "catkin_make --force-cmake -G"Eclipse CDT4 - Unix Makefiles""
+3) run "awk -f $(rospack find mk)/eclipse.awk build/.project > build/.project_with_env && mv build/.project_with_env build/.project"
+4) Open eclipse 
+5) File -> Import -> General -> Existing Project to Workspace
+6) Select build directory (/ros/build/) and DO NOT check "Copy projects into workspace"
+7) Close Eclipse.
+
+Whenever you open Eclipse do it from the terminal to import shell environment:
+run "bash -i -c "eclipse44"  (the 44 denotes Luna 4.4)
+
+If still can't resolve some symbols try:
+Navigate to Project -> C/C++ General -> Preprocessor Include Paths -> Provides tab
+Then check the box for CDT GCC Compiler Build-in Settings [shared]
+Right click on project -> Index -> Rebuild
+
+If any project dependencies change you have to rebuild eclipse project files to synchronize.
