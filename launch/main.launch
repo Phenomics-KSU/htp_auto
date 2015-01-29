@@ -4,5 +4,7 @@
 		<remap from="robot/pose" to="robot_pose_ekf/odom_combined" />
 	</node>
 		
+	<node pkg="htp_auto" type="mission" name="mission" />
+		
 	<node pkg="htp_auto" type="pid" name="heading_pid" />
 </launch>

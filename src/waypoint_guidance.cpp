@@ -313,7 +313,7 @@ private: // fields
     // Last time that PID server was ran.
     ros::Time heading_pid_last_time_;
 
-    // Commanded velocity when travelling to target.
+    // Commanded velocity when traveling to target.
     double travel_velocity_;
     
     // Current state of guidance.
@@ -354,7 +354,7 @@ private: // fields
 /**
  * This class implements the action server that uses the base waypoint guidance logic.
  *
- * It subsribes to the robot's pose topic and synchronously publishes the linear/angular velocity commands.
+ * It subscribes to the robot's pose topic and synchronously publishes the linear/angular velocity commands.
  *
  *  * <<<<<<<<<<<  ALL UNITS ARE SI UNLESS OTHERWISE NOTED  >>>>>>>>>>>>>>>
  */
@@ -403,7 +403,7 @@ public: // methods
             velocity_publisher_.publish(velocity_message);
 
             // Temporary. Just for debugging.
-            ROS_INFO_THROTTLE(2, "Guide: (%.3lf, %.3lf, %.1lf)", position[0], position[1], heading * 180 / M_PI);  
+            // ROS_INFO_THROTTLE(2, "Guide: (%.3lf, %.3lf, %.1lf)", position[0], position[1], heading * 180 / M_PI);  
         }
     }
 
@@ -434,7 +434,15 @@ public: // methods
 
         goal_periodic_timer_.stop();
         
-        if (reached_target_)
+        if (!reached_target_)
+        {
+            // Never reached goal so make sure vehicle is stopped.  (for example if client cancelled goal)
+            geometry_msgs::Twist zero_velocity_message;
+            zero_velocity_message.linear.x = 0;
+            zero_velocity_message.angular.z = 0;
+            velocity_publisher_.publish(zero_velocity_message);
+        }
+        else // reached target.
         {
             // Notify client that the goal succeeded.
             htp_auto::WaypointGuidanceResult result;
