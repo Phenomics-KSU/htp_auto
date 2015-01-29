@@ -1,12 +1,11 @@
-# goal definition
+# goal
 int32 frame
-float64 kyle
 float64 target_x
 float64 target_y
 float64 acceptance_radius
 bool stop_at_target
 ---
-# result definition
+# result
 float64 distance_remaining
 ---
 # feedback
