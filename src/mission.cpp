@@ -73,11 +73,11 @@ public: // methods
 
             if (is_action || !success)
             {
-            	// If command was an action it should have started.
-            	break;
+                // If command was an action it should have started.
+                break;
             }
 
-			advanceCurrentIndex();
+            advanceCurrentIndex();
         }
         
         return success;
@@ -123,15 +123,15 @@ public: // methods
     // Increments current index by one.  Returns false if failed because current index is already at max.
     bool advanceCurrentIndex(void)
     {
-    	// Hold invariant that index can never be greater than # of items.
-    	if ((current_index_ + 1) > items_.size())
-    	{
-    		return false;
-    	}
+        // Hold invariant that index can never be greater than # of items.
+        if ((current_index_ + 1) > items_.size())
+        {
+            return false;
+        }
 
-    	++current_index_;
+        ++current_index_;
 
-    	return true; // Successfully incremented.
+        return true; // Successfully incremented.
     }
 
     // Appends (copies) command to end of list.  Returns its index in the list.
@@ -153,11 +153,11 @@ public: // methods
     // Sets current command index to the specified value. Returns true if successful.
     bool setCurrentItemIndex(uint32_t new_index)
     {
-    	if (new_index > items_.size())
-    	{
-    		ROS_WARN("Capping index from %u to %u which signifies end of mission.", new_index, items_.size());
-    		new_index = items_.size();
-    	}
+        if (new_index > items_.size())
+        {
+            ROS_WARN("Capping index from %u to %u which signifies end of mission.", new_index, items_.size());
+            new_index = items_.size();
+        }
 
         current_index_ = new_index;
         ROS_INFO("Set mission index to: %u", new_index);
@@ -201,11 +201,11 @@ public: // methods
     // Called when guidance goal is ended (either because it reached waypoint or something stopped it).
     void guidanceGoalCompleteCallback(const actionlib::SimpleClientGoalState & state, const WaypointGuidanceResultConstPtr & result)
     {
-    	if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
-    	{
-    		advanceCurrentIndex();
-    		executeToNextAction();
-    	}
+        if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+        {
+            advanceCurrentIndex();
+            executeToNextAction();
+        }
     }
 
 private: // methods

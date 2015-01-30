@@ -47,6 +47,7 @@ find_package(catkin REQUIRED
 add_message_files(
   FILES
   Command.msg
+  PIDState.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -84,7 +85,7 @@ generate_dynamic_reconfigure_options(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+  INCLUDE_DIRS include
 #  LIBRARIES htp_auto
   CATKIN_DEPENDS message_runtime actionlib_msgs
 #  DEPENDS system_lib
@@ -104,22 +105,17 @@ include_directories(include)
 # )
 
 ## Declare a cpp executable
-add_executable(waypoint_guidance src/waypoint_guidance.cpp)
-add_executable(pid src/pid.cpp)
+add_executable(waypoint_guidance src/waypoint_guidance.cpp src/pid.cpp)
 add_executable(mission src/mission.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(waypoint_guidance htp_auto_generate_messages_cpp)
 add_dependencies(waypoint_guidance {PROJECT_NAME}_gencfg)
-add_dependencies(pid htp_auto_generate_messages_cpp)
+add_dependencies(mission htp_auto_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(waypoint_guidance
-   ${catkin_LIBRARIES}
-)
-
-target_link_libraries(pid
    ${catkin_LIBRARIES}
 )
 

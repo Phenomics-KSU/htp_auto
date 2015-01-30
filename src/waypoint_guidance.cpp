@@ -4,8 +4,6 @@
 *  \summary    Implements an action server to move a differential drive robot to a 2D coordinate.
 *              When a goal is active the guidance logic runs in sync with new robot pose data.
 *              Publishes angular and forward linear velocity to commanded velocity topic.
-*  
-*  \depend     Requires a running PID server for heading control.
 */
 
 // Standard Headers
@@ -22,8 +20,10 @@
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <htp_auto/WaypointGuidanceAction.h>
-#include <htp_auto/PID.h>
 #include <htp_auto/GuidanceParamsConfig.h>
+
+// HTP Package Headers
+#include "pid.h"
 
 /**
  * Tracks a target in two dimensions.  Allows user to set a desired (x,y) position and provides 'update()' method
@@ -42,10 +42,6 @@
  *  closing in on target - Only entered if want to stop and have already reached acceptance radius.
  *                         Decreases velocity until the robot is close to the actual target
  *                         then comes to a complete stop.
- *
- * The only dependency on ROS is relying on a running PID server to convert heading -> angular velocity.
- * The reason it uses a server is it exposes just about everything about the loop through a service message.
- * This message can be monitored and the data plotted using rqt_plot.
  *
  * <<<<<<<<<<<  ALL UNITS ARE SI UNLESS OTHERWISE NOTED  >>>>>>>>>>>>>>>
  *
@@ -67,8 +63,8 @@ private: // types
 public: // methods
 
     // Constructor
-    WaypointGuidance2D(ros::ServiceClient & heading_pid_client) :
-        heading_pid_client_(heading_pid_client),
+    WaypointGuidance2D(PID & heading_pid) :
+        heading_pid_(heading_pid),
         heading_pid_last_time_(0),
         travel_velocity_(.5),
         state_(waiting_for_target),
@@ -84,9 +80,6 @@ public: // methods
         target_[1] = 0;
   
         acceptance_radius_ = min_acceptance_radius_;
-        
-        // TODO: setup dynamic reconfigure to change PID values at runtime
-        setPIDValues();
     }
     
     // New target should be (x,y)
@@ -168,9 +161,14 @@ public: // methods
     void dynamicConfigure(htp_auto::GuidanceParamsConfig & config, uint32_t level)
     {
         travel_velocity_ = config.travel_vel;
-        heading_pid_.request.kp = config.heading_kp;
-        heading_pid_.request.ki = config.heading_ki;
-        heading_pid_.request.kd = config.heading_kd;
+        heading_pid_.set_kp(config.heading_kp);
+        heading_pid_.set_ki(config.heading_ki);
+        heading_pid_.set_kd(config.heading_kd);
+        heading_pid_.set_saturation_high(config.heading_sat_high);
+        heading_pid_.set_saturation_low(config.heading_sat_low);
+        heading_pid_.set_integral_saturation_high(config.heading_int_sat_high);
+        heading_pid_.set_integral_saturation_low(config.heading_int_sat_low);
+        heading_pid_.set_pub_rate_prescaler(config.heading_pub_prescaler);
     }
 
 private: // methods
@@ -266,7 +264,7 @@ private: // methods
         return false; // because we still need to get closer to target.
     }
     
-    // Calls PID service.  Returns angular velocity command.
+    // Runs PID calculation.  Returns angular velocity command.
     double updateHeadingPID(double desired_heading, double actual_heading)
     {
         ros::Time current_time = ros::Time::now();
@@ -280,48 +278,24 @@ private: // methods
             heading_pid_last_time_ = current_time;   
             return 0;
         }
-    
-        heading_pid_.request.current_val = actual_heading;
-        heading_pid_.request.target_val = desired_heading;
-        heading_pid_.request.dt = dt;
         
-        // Call service.  This will block here until service returns.
-        heading_pid_client_.call(heading_pid_);
+        double heading_error = desired_heading - actual_heading;
         
-        heading_pid_.request.previous_error = heading_pid_.response.current_error;
-        heading_pid_.request.previous_integrator_val = heading_pid_.response.current_integrator_val;
+        double angular_velocity = heading_pid_.calculate(heading_error, dt);
         
         heading_pid_last_time_ = current_time;
 
-        return heading_pid_.response.output;
+        return angular_velocity;
     }
     
-    void setPIDValues(void)
-    {  
-        heading_pid_.request.kp = 1;
-        heading_pid_.request.ki = 0;
-        heading_pid_.request.kd = 0;
-        heading_pid_.request.current_val = 0;
-        heading_pid_.request.target_val = 0;
-        heading_pid_.request.previous_error = 0;
-        heading_pid_.request.previous_integrator_val = 0;
-        heading_pid_.request.integral_term_min = -100;
-        heading_pid_.request.integral_term_max = 100;
-        heading_pid_.request.output_max = 1;
-        heading_pid_.request.dt = 1;
-    }
-    
-    void reset_heading_pid_integral(void) { heading_pid_.request.previous_integrator_val = 0; }
+    void reset_heading_pid_integral(void) { heading_pid_.reset_integral_error(); }
     
 private: // fields
 
-    // Can call PID server to calculate angular velocity.
-    ros::ServiceClient & heading_pid_client_;
+    // Used to calculate angular velocity.
+    PID & heading_pid_;
     
-    // Service data (request and response).
-    htp_auto::PID heading_pid_;
-    
-    // Last time that PID server was ran.
+    // Last time that PID calculation was ran.
     ros::Time heading_pid_last_time_;
 
     // Commanded velocity when traveling to target.
@@ -414,14 +388,14 @@ public: // methods
             velocity_publisher_.publish(velocity_message);
 
             // Temporary. Just for debugging.
-            // ROS_INFO_THROTTLE(2, "Guide: (%.3lf, %.3lf, %.1lf)", position[0], position[1], heading * 180 / M_PI);  
+            //ROS_INFO_THROTTLE(2, "Guide: (%.3lf, %.3lf, %.1lf)", position[0], position[1], heading * 180 / M_PI);
         }
     }
 
     void executeGoalCallback(const htp_auto::WaypointGuidanceGoalConstPtr & goal)
     {
         // TODO validate and do something with goal frame
-    	double target[2] = { goal->target_x, goal->target_y };
+        double target[2] = { goal->target_x, goal->target_y };
         guidance_.setTarget(target, goal->stop_at_target);
         guidance_.setAcceptanceRadius(goal->acceptance_radius);
 
@@ -515,17 +489,13 @@ int main(int argc, char **argv)
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
 
-    // Heading PID service name
-    std::string pid_srv_name = "pid";
+    // Define publisher to output PID state data for tuning.
+    ros::Publisher heading_pid_pub = nh.advertise<htp_auto::PIDState>("heading_pid_state", 30);
 
-    while (!ros::service::waitForService(pid_srv_name, 2000))
-    {
-        ROS_ERROR_STREAM("Cannot connect to heading PID service: " << pid_srv_name);
-    }
-    
-    ros::ServiceClient heading_pid_client = nh.serviceClient<htp_auto::PID>("pid");
-    
-    WaypointGuidance2D waypoint_guidance(heading_pid_client);
+    // Default params to zero because they will get set in reconfigure callback.
+    PID heading_pid(0, 0, 0, 0, 0, 0, 0, &heading_pid_pub, -1);
+
+    WaypointGuidance2D waypoint_guidance(heading_pid);
 
     // Setup reconfigure server to allow for parameter updates.
     dynamic_reconfigure::Server<htp_auto::GuidanceParamsConfig> config_server;
