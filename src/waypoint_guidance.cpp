@@ -16,12 +16,14 @@
 #include <ros/ros.h>
 #include <actionlib/server/simple_action_server.h>
 #include <tf/transform_broadcaster.h>
+#include <dynamic_reconfigure/server.h>
 
 // ROS Topic Headers
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <htp_auto/WaypointGuidanceAction.h>
 #include <htp_auto/PID.h>
+#include <htp_auto/GuidanceParamsConfig.h>
 
 /**
  * Tracks a target in two dimensions.  Allows user to set a desired (x,y) position and provides 'update()' method
@@ -65,10 +67,10 @@ private: // types
 public: // methods
 
     // Constructor
-    WaypointGuidance2D(ros::ServiceClient & heading_pid_client, double travel_velocity) :
+    WaypointGuidance2D(ros::ServiceClient & heading_pid_client) :
         heading_pid_client_(heading_pid_client),
         heading_pid_last_time_(0),
-        travel_velocity_(travel_velocity),
+        travel_velocity_(.5),
         state_(waiting_for_target),
         min_acceptance_radius_(0.3), // Do not make this zero.
         minimum_stopping_speed_(.05), // Do not make this zero.
@@ -162,6 +164,15 @@ public: // methods
         return reached_target;
     }
     
+    // Should be called from reconfiguration server.
+    void dynamicConfigure(htp_auto::GuidanceParamsConfig & config, uint32_t level)
+    {
+        travel_velocity_ = config.travel_vel;
+        heading_pid_.request.kp = config.heading_kp;
+        heading_pid_.request.ki = config.heading_ki;
+        heading_pid_.request.kd = config.heading_kd;
+    }
+
 private: // methods
     
     void updateState(state_t new_state)
@@ -285,18 +296,18 @@ private: // methods
         return heading_pid_.response.output;
     }
     
-    void setPIDValues()
+    void setPIDValues(void)
     {  
-        heading_pid_.request.kp = .2;
+        heading_pid_.request.kp = 1;
         heading_pid_.request.ki = 0;
         heading_pid_.request.kd = 0;
         heading_pid_.request.current_val = 0;
         heading_pid_.request.target_val = 0;
-        //heading_pid_.request.max_output = 0.5;
         heading_pid_.request.previous_error = 0;
         heading_pid_.request.previous_integrator_val = 0;
         heading_pid_.request.integral_term_min = -100;
         heading_pid_.request.integral_term_max = 100;
+        heading_pid_.request.output_max = 1;
         heading_pid_.request.dt = 1;
     }
     
@@ -496,7 +507,6 @@ private: // fields
 
 };
 
-
 int main(int argc, char **argv)
 {
     // Setup ROS node.
@@ -504,9 +514,6 @@ int main(int argc, char **argv)
     
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
-    
-    // TODO: make this configurable
-    double travel_velocity = .5;
 
     // Heading PID service name
     std::string pid_srv_name = "pid";
@@ -518,8 +525,17 @@ int main(int argc, char **argv)
     
     ros::ServiceClient heading_pid_client = nh.serviceClient<htp_auto::PID>("pid");
     
-    WaypointGuidance2D waypoint_guidance(heading_pid_client, travel_velocity);
+    WaypointGuidance2D waypoint_guidance(heading_pid_client);
+
+    // Setup reconfigure server to allow for parameter updates.
+    dynamic_reconfigure::Server<htp_auto::GuidanceParamsConfig> config_server;
+    dynamic_reconfigure::Server<htp_auto::GuidanceParamsConfig>::CallbackType config_callback;
+
+    // Setting this callback will initially call it will all the default values.
+    config_callback = boost::bind(&WaypointGuidance2D::dynamicConfigure, &waypoint_guidance, _1, _2);
+    config_server.setCallback(config_callback);
     
+    // Create action server to provide ROS interface with guidance logic.
     WaypointGuidanceAction guidance_action_server(nh, ros::this_node::getName(), waypoint_guidance);
     
     // Wait for callbacks.

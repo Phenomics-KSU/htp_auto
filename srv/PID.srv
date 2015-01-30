@@ -7,6 +7,7 @@ float64 previous_error
 float64 previous_integrator_val
 float64 integral_term_min
 float64 integral_term_max
+float64 output_max
 float64 dt
 ---
 float64 output

@@ -4,26 +4,35 @@
 #include "ros/ros.h"
 #include "htp_auto/PID.h"
 
+template<class T>
+T limit(T value, T min, T max)
+{
+	if (value > max)
+	{
+		value = max;
+	}
+	else if (value < min)
+	{
+		value = min;
+	}
+
+	return value;
+}
+
 bool computePIDOut(htp_auto::PID::Request& req, htp_auto::PID::Response& res)
 {
-    // Declare variables.
-    float error = req.target_val - req.current_val;
-    float integral_term = req.previous_integrator_val + error * req.dt;
+    double error = req.target_val - req.current_val;
+    double integral_term = req.previous_integrator_val + error * req.dt;
 
     // Apply integrator limits.
-    if (integral_term < req.integral_term_min)
-    {
-        integral_term = req.integral_term_min;
-    }
-    if (integral_term > req.integral_term_max)
-    {
-        integral_term = req.integral_term_max;
-    }
+    integral_term = limit(integral_term, req.integral_term_min, req.integral_term_max);
 
     if (req.dt != 0.0)
     {
-        // Compute the output.
+        // Compute the output and cap at maximum.
         res.output = req.kp * error + req.ki * integral_term + req.kd * (error - req.previous_error) / req.dt;
+
+        res.output = limit(res.output, -req.output_max, req.output_max);
     }
     else 
     {

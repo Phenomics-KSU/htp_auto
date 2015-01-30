@@ -12,6 +12,7 @@ find_package(catkin REQUIRED
   std_msgs
   actionlib_msgs
   tf
+  dynamic_reconfigure
 )
 
 
@@ -69,6 +70,10 @@ generate_messages(
   std_msgs
 )
 
+generate_dynamic_reconfigure_options(
+  cfg/GuidanceParams.cfg
+)
+
 ###################################
 ## catkin specific configuration ##
 ###################################
@@ -106,6 +111,7 @@ add_executable(mission src/mission.cpp)
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(waypoint_guidance htp_auto_generate_messages_cpp)
+add_dependencies(waypoint_guidance {PROJECT_NAME}_gencfg)
 add_dependencies(pid htp_auto_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
