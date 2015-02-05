@@ -7,4 +7,6 @@
 		
 	<node pkg="htp_auto" type="mission" name="mission" />
 	
+	<node pkg="htp_auto" type="mission_loader" name="mission_loader" />
+	
 </launch>

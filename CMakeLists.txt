@@ -54,6 +54,7 @@ add_message_files(
 add_service_files(
   FILES
   AddMissionItem.srv
+  LoadMissionFile.srv
   PID.srv
   SetMissionItem.srv
 )
@@ -107,12 +108,14 @@ include_directories(include)
 ## Declare a cpp executable
 add_executable(waypoint_guidance src/waypoint_guidance.cpp src/pid.cpp)
 add_executable(mission src/mission.cpp)
+add_executable(mission_loader src/mission_loader.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 add_dependencies(waypoint_guidance htp_auto_generate_messages_cpp)
 add_dependencies(waypoint_guidance {PROJECT_NAME}_gencfg)
 add_dependencies(mission htp_auto_generate_messages_cpp)
+add_dependencies(mission_loader htp_auto_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(waypoint_guidance
@@ -120,6 +123,10 @@ target_link_libraries(waypoint_guidance
 )
 
 target_link_libraries(mission
+   ${catkin_LIBRARIES}
+)
+
+target_link_libraries(mission_loader
    ${catkin_LIBRARIES}
 )
 
