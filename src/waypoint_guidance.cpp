@@ -278,9 +278,14 @@ private: // methods
             heading_pid_last_time_ = current_time;   
             return 0;
         }
-        
+
         double heading_error = desired_heading - actual_heading;
         
+        // Make sure heading is between -pi and +pi to avoid 'wrap around' problem
+        // when trying to hold a heading of -/+ pi radians.
+        while (heading_error > +M_PI) { heading_error -= 2.0 * M_PI; }
+        while (heading_error < -M_PI) { heading_error += 2.0 * M_PI; }
+
         double angular_velocity = heading_pid_.calculate(heading_error, dt);
         
         heading_pid_last_time_ = current_time;
@@ -376,8 +381,12 @@ public: // methods
             geometry_msgs::Pose const & pose = message.pose.pose;
             double linear_velocity = 0;
             double angular_velocity = 0;
-            double position[2] = {pose.position.x, pose.position.y};
+            double position[2] = { pose.position.x, pose.position.y };
             double heading = tf::getYaw(pose.orientation);
+
+            // Make sure heading is between -pi and +pi to keep consistent with desired heading.
+            while (heading > +M_PI) { heading -= 2.0 * M_PI; }
+            while (heading < -M_PI) { heading += 2.0 * M_PI; }
            
             reached_target_ = guidance_.update(position, heading, linear_velocity, angular_velocity);
             

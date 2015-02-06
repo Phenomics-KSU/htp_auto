@@ -106,7 +106,7 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
     std::ifstream in_stream;
     in_stream.open(request.file_name.c_str());
 
-    if (!in_stream)
+    if (!in_stream.is_open())
     {
         ROS_WARN_STREAM("Cannot open file: " << request.file_name);
         return false;
