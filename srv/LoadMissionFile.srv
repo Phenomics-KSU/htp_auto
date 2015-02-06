@@ -1,3 +1,4 @@
 string file_name
 ---
 int32 num_items_loaded
+int32 total_items_in_mission

@@ -116,6 +116,7 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
     Command command; // Command structure wrapped by service data type.
     std::string line; // Used as current line pulled out from file.
     int num_items_loaded = 0; // How many items have been successfully loaded to mission.
+    int total_items_in_mission = 0; // How many items are stored in mission.
 
     while (std::getline(in_stream, line))
     {
@@ -131,6 +132,9 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
             ROS_WARN("Add command service failed.");
             return false;
         }
+
+        // It's useful to report total mission items in case user forgot to clear existing mission items.
+        total_items_in_mission = add_item.response.item_index + 1;
 
         ++num_items_loaded;
     }
@@ -151,6 +155,7 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
     }
 
     response.num_items_loaded = num_items_loaded;
+    response.total_items_in_mission = total_items_in_mission;
 
     return true;
 }
