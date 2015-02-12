@@ -1,0 +1,74 @@
+These instructions are for setting up a computer to run ROS and also download/build the htp package for Husky.
+
+ROS lines up with certain versions of Ubuntu.  
+Hydro -> 12.04 LTS (Precise)
+Indigo -> 14.04 LTS (Trusty)
+
+The first step is written for Hydro, but should be easily modified for using Indigo.
+
+Step 1: Install ROS
+Follow the instructions in this link:
+Note - select the desktop-full install.
+http://wiki.ros.org/hydro/Installation/Ubuntu
+
+Step 2: Install Git
+First install git by running:
+sudo apt-get install git-core
+
+Then enable git colors on the command line using:
+git config --global color.ui auto
+
+Then setup your information:
+git config --global user.name "Your Name"
+git config --global user.email youremail@whatever
+
+Step 3: Install Husky Packages
+Run the following install command:
+sudo apt-get install ros-hydro-husky-robot ros-hydro-husky-desktop
+
+Step 4: Setup 'htp_auto' Package
+Open a terminal and cd to your home directory.
+cd ~
+
+Create a directy there named 'ros' and change into it
+mkdir ros
+cd ros
+
+Create a subdirecty inside 'ros' named 'src' and change into it
+mkdir src
+cd src
+
+Obtain the URL to clone the repo.  You can do this by going to github and searching 'htp_auto'.  Then select the text in the HTTPS box.  Currently the link is:
+https://github.com/Phenomics-KSU/htp_auto.git
+
+Still in the '~/ros/src' directly run:
+git clone <URL> (where <URL> is from github)
+So using the link above it would be:
+git clone https://github.com/Phenomics-KSU/htp_auto.git
+
+You can then build the package by going back to '~/ros' and running:
+catkin_make
+
+Step 5: Install Eclipse (optional but recommended)
+Follow this link and download "Eclipse IDE for C/C++ Developers"
+http://www.eclipse.org/downloads/?osType=linux
+
+cd to the directy you downloaded it to and extract using:
+tar -zxvf eclipse.XX.YY.tar.gz
+
+Become root and copy the extracted folder to /opt
+sudo mv eclipse.XX.YY /opt
+
+Create a symlink in /usr/local/bin using:
+sudo ln -s /opt/eclipse/eclipse /usr/local/bin/eclipse44
+
+Install either JRE or JDK.  I just installed JRE since I wasn't planning on doing java development.
+sudo apt-get install openjdk-7-jre
+
+If you want to install an icon you can follow the rest of the steps:
+Note* - you'll usually want to launch eclipse from the command line (see below) so I didn't do this part.
+http://askubuntu.com/questions/26632/how-to-install-eclipse
+
+Then to setup a ROS project in eclipse follow the other documentation file detailing how to do that.
+
+
