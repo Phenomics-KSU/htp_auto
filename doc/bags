@@ -1,0 +1,16 @@
+To start recording data in a bag:
+1) Open a new terminal tab (ctrl+shift+T)
+2) cd into '~/bags' (create it if doesn't exist)
+3) rosbag record -O filename /topic_name_to_record
+4) when finished stop bagging with ctrl+C
+
+For example to log position data run
+rosbag record -O ashland_field_5 /robot_pose_ekf/odom_combined
+
+And after your finished a bag file should be created called
+~/bags/ashland_field_5.bag
+
+Then to view information about it run:
+rosbag info ashland_field_5.bag
+
+
