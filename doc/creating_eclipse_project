@@ -11,6 +11,8 @@ Summarized from http://wiki.ros.org/IDEs
 Whenever you open Eclipse do it from the terminal to import shell environment:
 run "bash -i -c "eclipse44"  (the 44 denotes Luna 4.4)
 
+If you get a warning about not being to find a 'test' directory in the include paths then remove that directly from the list of project include paths.  It can sometimes silently mess up the build command.
+
 If still can't resolve some symbols try:
 Navigate to Project -> C/C++ General -> Preprocessor Include Paths -> Provides tab
 Then check the box for CDT GCC Compiler Build-in Settings [shared]

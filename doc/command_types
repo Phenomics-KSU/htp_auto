@@ -1,0 +1,23 @@
+
+
+Command Field Types:
+int32 type 
+int32 param0
+float64 param1
+float64 param2
+float64 param3
+float64 param4
+float64 param5
+float64 param6
+float64 param7
+
+Command: Waypoint
+type	: 0 
+param0	: Frame (see frame definitions)
+param1	: Target X Position - Relative to frame
+param2	: Target Y Position - Relative to frame
+param3	: Target Z Position - Relative to frame
+param4	: Acceptance Radius (meters)
+param5	: Stop at Target (true if nonzero)
+param6	: Unused
+param7	: Unused
