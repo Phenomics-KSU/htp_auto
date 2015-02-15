@@ -1,0 +1,25 @@
+<launch>
+
+    <include file="$(find htp_auto)/launch/base/guidance.launch" />
+    
+    <node pkg="um6" type="um6_driver" name="um6_imu"> </node>
+    
+    <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver"> </node>
+    
+	<node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+    	<remap from="imu_data" to="imu/data" />
+    	<remap from="odom" to="encoder" />
+        <rosparam>
+            freq: 30.0
+            sensor_timeout: 1.0
+            publish_tf: false
+            odom_used: true
+            imu_used: true
+            vo_used: false
+            gps_used: true
+            imu_absolute: true
+            output_frame: odom
+        </rosparam>
+    </node>
+
+</launch>
