@@ -1,0 +1,14 @@
+To transfer a file/directory between the husky and laptop use the scp command.  
+
+NOTE: The IP address below are for wired connection.  If using wireless you'll need to use the wireless husky IP.
+
+An example of copying over the entire 'htp_auto' directory from the laptop to the husky is:
+(executed from the laptop terminal at ~/ros/src/)
+scp -pr htp_auto/. administrator@192.168.1.11:/home/administrator/ros/src/htp_auto
+
+The p says to preserve file meta data
+The r says to recursively copy all files and directories
+
+Another useful examples is moving back the bag file named 'lab_test_1.bag' from the husky to the laptop.
+(executed from the laptop terminal)
+scp -p administrator@192.168.1.11:/home/administrator/bags/lab_test_1.bag ~/bags/lab_test_1.bag

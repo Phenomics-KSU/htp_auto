@@ -13,4 +13,4 @@ And after your finished a bag file should be created called
 Then to view information about it run:
 rosbag info ashland_field_5.bag
 
-
+Then to move it back see the 'transfer' help document.

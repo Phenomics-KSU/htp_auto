@@ -163,7 +163,7 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
 int main(int argc, char **argv)
 {
     // Setup ROS node.
-    ros::init(argc, argv, "mission");
+    ros::init(argc, argv, "mission_loader");
 
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
