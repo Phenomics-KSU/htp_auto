@@ -1,0 +1,40 @@
+There are two methods to connect to Husky from ground station laptop.
+1) Wireless - using a router and wifi antenna on husky
+2) Wired - direct connection over ethernet
+
+The router we currently use (TP-Link TL-WR841ND) is setup for these reservations:
+LevovoT400 wireless (wlan0) - 192.168.1.100
+LevovoT400 wired (eth0) - 192.168.1.102
+Husky wireless (wlan0) - 192.168.1.101
+
+To change router settings:
+1) Connect to router
+2) Open browser and type in "http://tplinklogin.net/"
+3) Type admin/admin to access 
+
+The husky was shipped configured as a bridged network with the internal wired interface (eth0) set to 192.168.1.11. 
+When using wired method click on the 'HuskyWiredDirect' connection which has the following settings:
+Manual IPv4 (static)
+IP: 192.168.1.10
+Mask: 24
+Default gateway: 192.168.0.254
+
+When using wireless method the Husky should automatically connect to the router.
+
+Once you can can connect there are two options for doing so:
+1) ROS - extends laptop to be part of the onboard computer's ROS environment.
+To connect type (on the laptop's terminal):
+export ROS_MASTER_URI=http://<husky IP>:11311  (don't forget the http://)
+export ROS_IP=<laptop IP>
+Then to check if it worked type:
+rostopic list
+
+2) SSH - Secure SHell. Allows you to open a 'terminal' on the onboard computer. To connect type:
+ssh administrator@<husky IP> 
+Then when you're done just type:
+exit
+
+Extra notes:
+   - If you want to switch between wireless/wired you must disconnect the method you're current using (ie turn off router if you want to start using wired) and then restart the husky.  I'm not sure why, but otherwise I always get "no route to host"
+
+
