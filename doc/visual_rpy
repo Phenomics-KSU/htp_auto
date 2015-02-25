@@ -1,0 +1,6 @@
+To convert a topic from quaternions to a new roll pitch yaw topic use the quat_to_euler node.
+
+For example to convert the orientation output of the EKF to a new topic so that it can be plotted or echoed
+use the following command: 
+
+rosrun htp_auto quat_to_euler odom:=robot_pose_ekf/odom_combined rpy_odom:=odom_euler
