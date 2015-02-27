@@ -1,81 +1,14 @@
 To open a bunch of tabs and commands:
 
-1) Navigate to ./htp_auto/tools/
+1) Open terminal and navigate to ./htp_auto/tools/
 
-2) Give htp_term_start.bash execute permissions
-"chmod x+ ./htp_term_start.bash
+2) If you haven't already give quick_start.bash execute permissions:
+"chmod x+ ./quick_start.bash
 
-3) Paste everything below last step to the end of your ~/.bashrc file.
-(you might have to hit ctrl+H to show hidden files)
+3) Run the script using:
+"./quick_start.bash"
+  - NOTE: if using wired connection to husky append "wired" afterwards to set correct IP. 
+       i.e. "./quick_start.bash wired"
+  - NOTE: Do not type or click anywhere when script is running and tabs are still being opened.
+          This includes maximizing the newly opened terminal. 
 
-4) Run the script by typing "./htp_term_start.bash"
-  - NOTE: if using wired connection to husky append "wired" afterwards. 
-       i.e. "./htp_term_start.bash wired"
-
-5) Copy and paste the output into your terminal and execute it.
-
-# Taken from:
-# http://askubuntu.com/questions/446041/setting-terminal-tab-titles
-#if MYTAB is not set, return
-[ -z "$MYTAB" ] && return
-# reset the cursor and title 
-PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
-# KLM: removed \w before \a\ to remove current directory
-PS1="\[\e]0;$MYTAB \a\]$PS1"   #title: $MYTAB
-
-# IP of robot. Default to wireless.
-husky_ip=192.168.1.101 # wireless
-if [ "$HUSKY_WIRED" ]; then
-	husky_ip=192.168.1.11 # wired
-fi
-
-# Execute the commands for every tab
-case "$MYTAB" in
-        ssh1)
-                echo ssh administrator@"$husky_ip"
-        ;;
-	ssh_bag)
-                echo ssh administrator@"$husky_ip"
-                echo cd ~/bags
-                echo "rosbag record -O your_file_name /robot_pose_ekf/odom_combined"
-		echo press ctrl-C to stop
-        ;;
-        mission)
-        	export ROS_MASTER_URI=http://"$husky_ip":11311
-		echo "rosservice call /start_mission"
-        ;;
-        loader)
-		export ROS_MASTER_URI=http://"$husky_ip":11311
-                echo "rosrun htp_auto mission_loader"
-        ;;
-	rqt1)
-                export ROS_MASTER_URI=http://"$husky_ip":11311
-		echo "rqt_plot"
-        ;;
-        rqt2)
-                export ROS_MASTER_URI=http://"$husky_ip":11311
-		echo "rqt"
-        ;;
-        rpy)
-                export ROS_MASTER_URI=http://"$husky_ip":11311
-		echo "rosrun htp_auto quat_to_euler odom:=robot_pose_ekf/odom_combined rpy_odom:=odom_euler"
-        ;;
-        scp2h)
-		echo "To move htp package to husky"
-                echo "scp -pr htp_auto/. administrator@"$husky_ip":/home/administrator/ros/src/htp_auto"
-        ;;
-        scp2gs)
-		echo "To move log file back from husky"
-		echo "scp -p administrator@"$husky_ip":/home/administrator/bags/your_bag_file.bag ~/bags/your_bag_file.bag"
-        ;;
-        sim)
-                echo roslaunch husky_gazebo husky_empty_world.launch
-        ;;
-        git)
-                cd ~/ros/src/htp_auto
-                git status
-        ;;
-        eclipse)
-                echo "bash -i -c eclipse44"
-        ;;
-esac
