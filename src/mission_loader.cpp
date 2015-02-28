@@ -129,7 +129,7 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
         add_item.request.item = command;
         if (!add_item_client.call(add_item))
         {
-            ROS_WARN("Add command service failed.");
+            ROS_WARN("Add command service failed. Is guidance running?");
             return false;
         }
 
@@ -167,12 +167,39 @@ int main(int argc, char **argv)
 
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
+    ros::NodeHandle nhp("~"); // Private handle for parameters.
 
     // Connect to mission node and setup clients to consume services.
     add_item_client = nh.serviceClient<AddMissionItem>("add_mission_item");
     reset_mission_client = nh.serviceClient<std_srvs::Empty>("reset_mission");
 
     ros::ServiceServer load_file_service = nh.advertiseService("load_mission_file", loadFileCallback);
+
+    // Check if caller provided mission file name.
+    std::string mission_file_name;
+    bool file_provided = nhp.getParam("mission_file", mission_file_name);
+
+    if (file_provided)
+    {
+    	LoadMissionFile::Request request;
+		LoadMissionFile::Response response;
+		request.file_name = mission_file_name;
+    	bool load_success = loadFileCallback(request, response);
+    	if (load_success)
+    	{
+    		ROS_INFO("Successfully loaded mission file.");
+    		ROS_INFO("Loaded %d items from file. Mission now contains %d items.",
+    				response.num_items_loaded, response.total_items_in_mission);
+    	}
+    	else
+    	{
+    		ROS_INFO("Mission file could not be loaded.");
+    	}
+    }
+    else
+    {
+    	ROS_INFO("File not provided. Use load service.");
+    }
 
     // Wait for callbacks.
     ros::spin();

@@ -18,14 +18,13 @@ tab[0]="ssh1"
 tab[1]="bag"
 tab[2]="msn"
 tab[3]="ld"
-tab[4]="ld2"
-tab[5]="cvt"
-tab[6]="rqt"
-tab[7]="rpy"
-tab[8]="scp2h"
-tab[9]="scp2gs"
-tab[10]="git"
-tab[11]="eclipse"
+tab[4]="cvt"
+tab[5]="rqt"
+tab[6]="rpy"
+tab[7]="cp2h"
+tab[8]="cp2gs"
+tab[9]="git"
+tab[10]="eclipse"
 
 # IP of robot. Default to wireless.
 husky_ip="192.168.1.101" # wireless
@@ -41,11 +40,17 @@ sleep 2
 num_tabs=${#tab[@]}
 for ((i = 0; i < num_tabs; i++))
 do
-    # Open new tab.
-    xdotool key ctrl+shift+T
 
-    # Wait for new tab to open up before typing.
-    sleep 1.3
+    # If this is first tab just use the window we just opened up.
+    if [ $i -ne 0 ]; then
+
+        # Open new tab.
+        xdotool key ctrl+shift+T
+        
+        # Wait for new tab to open up before typing.
+        sleep 1.3
+        
+    fi
 
     # Change tab title
     # NOTE: must comment out PS1 in .bashrc for this to work.
@@ -72,11 +77,7 @@ do
         ;;
         ld)
 		    exec_command "export ROS_MASTER_URI=http://${husky_ip}:11311"
-            type_command "rosrun htp_auto mission_loader"
-        ;;
-        ld2)
-		    exec_command "export ROS_MASTER_URI=http://${husky_ip}:11311"
-            type_command "rosservice call /load_mission_file /home/htp/missions/your_file.mission"
+            type_command "rosrun htp_auto mission_loader _mission_file:=\"/home/htp/missions/your_file.mission\""
         ;;
         cvt)
 		    exec_command "cd ~/ros/src/htp_auto/tools/"
