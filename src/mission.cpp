@@ -234,7 +234,7 @@ private: // methods
         return success;
     }
     
-    // Converts command to goal for guidance action server.  Returns true if goal is sent succesfully.
+    // Converts command to goal for guidance action server.  Returns true if goal is sent successfully.
     bool executeWaypoint(Command const & item)
     {
         if (!guidance_client_.waitForServer(ros::Duration(1.5)))

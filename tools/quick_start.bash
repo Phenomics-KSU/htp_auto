@@ -94,11 +94,11 @@ do
             exec_command "export ROS_MASTER_URI=http://${husky_ip}:11311"
 		    type_command "rosrun htp_auto quat_to_euler odom:=robot_pose_ekf/odom_combined rpy_odom:=odom_euler"
         ;;
-        scp2h)
+        cp2h)
 		    exec_command "echo -e \"\nTo move htp package to husky\n\""
             type_command "scp -pr ~/ros/src/htp_auto/. administrator@${husky_ip}:/home/administrator/ros/src/htp_auto"
         ;;
-        scp2gs)
+        cp2gs)
 		    exec_command "echo -e \"\nTo move log file back from husky\n\""
 		    type_command "scp -p administrator@"${husky_ip}":/home/administrator/bags/your_file.bag ~/bags/your_file.bag"
         ;;
