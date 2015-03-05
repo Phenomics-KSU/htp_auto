@@ -8,6 +8,6 @@
         <param name="baud" value="$(arg baud)"/>
     </node>
 
-	<node pkg="htp_auto" type="gps_converter" name="gps_converter"> </node>
+    <node pkg="htp_auto" type="gps_converter" name="gps_converter"> </node>
 
 </launch>

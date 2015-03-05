@@ -35,23 +35,23 @@ void convert(const geometry_msgs::Quaternion & quat_msg, geometry_msgs::Vector3 
 
 void QuatMsgCallback(const geometry_msgs::Quaternion msg)
 {
-	geometry_msgs::Vector3 rpy;
-	convert(msg, rpy);
+    geometry_msgs::Vector3 rpy;
+    convert(msg, rpy);
     quat_rpy_publisher.publish(rpy);
 }
 
 void IMUMsgCallback(const geometry_msgs::Pose msg)
 {
-	geometry_msgs::Vector3 rpy;
-	convert(msg.orientation, rpy);
-	imu_rpy_publisher.publish(rpy);
+    geometry_msgs::Vector3 rpy;
+    convert(msg.orientation, rpy);
+    imu_rpy_publisher.publish(rpy);
 }
 
 void OdomMsgCallback(const geometry_msgs::PoseWithCovarianceStamped msg)
 {
-	geometry_msgs::Vector3 rpy;
-	convert(msg.pose.pose.orientation, rpy);
-	odom_rpy_publisher.publish(rpy);
+    geometry_msgs::Vector3 rpy;
+    convert(msg.pose.pose.orientation, rpy);
+    odom_rpy_publisher.publish(rpy);
 }
 
 int main(int argc, char **argv)

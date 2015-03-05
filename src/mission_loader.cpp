@@ -181,24 +181,24 @@ int main(int argc, char **argv)
 
     if (file_provided)
     {
-    	LoadMissionFile::Request request;
-		LoadMissionFile::Response response;
-		request.file_name = mission_file_name;
-    	bool load_success = loadFileCallback(request, response);
-    	if (load_success)
-    	{
-    		ROS_INFO("Successfully loaded mission file.");
-    		ROS_INFO("Loaded %d items from file. Mission now contains %d items.",
-    				response.num_items_loaded, response.total_items_in_mission);
-    	}
-    	else
-    	{
-    		ROS_INFO("Mission file could not be loaded.");
-    	}
+        LoadMissionFile::Request request;
+        LoadMissionFile::Response response;
+        request.file_name = mission_file_name;
+        bool load_success = loadFileCallback(request, response);
+        if (load_success)
+        {
+            ROS_INFO("Successfully loaded mission file.");
+            ROS_INFO("Loaded %d items from file. Mission now contains %d items.",
+                    response.num_items_loaded, response.total_items_in_mission);
+        }
+        else
+        {
+            ROS_INFO("Mission file could not be loaded.");
+        }
     }
     else
     {
-    	ROS_INFO("File not provided. Use load service.");
+        ROS_INFO("File not provided. Use load service.");
     }
 
     // Wait for callbacks.

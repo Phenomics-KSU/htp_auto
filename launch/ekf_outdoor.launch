@@ -1,8 +1,8 @@
 <launch>
 
-	<node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
-    	<remap from="imu_data" to="imu/data" />
-    	<remap from="odom" to="encoder" />
+    <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+        <remap from="imu_data" to="imu/data" />
+        <remap from="odom" to="encoder" />
         <rosparam>
             freq: 30.0
             sensor_timeout: 1.0

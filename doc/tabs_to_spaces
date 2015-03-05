@@ -1,0 +1,5 @@
+From:
+http://stackoverflow.com/questions/11094383/how-can-i-convert-tabs-to-spaces-in-every-file-of-a-directory
+
+Replace 'java' with type of files to search through in current directory:
+find . -name '*.java' ! -type d -exec bash -c 'expand -t 4 "$0" > /tmp/e && mv /tmp/e "$0"' {} \;

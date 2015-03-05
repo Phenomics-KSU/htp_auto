@@ -9,7 +9,7 @@
 void lla_2_ecef(const double lla[3], // lat, lon, alt above ellipsoid [rad, rad, m]
                 double ecef[3])      // earth centered earth fixed (m)
 {
-  const double a = 6378137.0;	      // Equatorial Radius (m)
+  const double a = 6378137.0;         // Equatorial Radius (m)
   const double e = 8.1819190842622e-2;  // Eccentricity (m)
   double sinLat, sinLon, cosLat, cosLon;
   double N;
@@ -19,7 +19,7 @@ void lla_2_ecef(const double lla[3], // lat, lon, alt above ellipsoid [rad, rad,
     cosLat = cos(lla[0]);
     cosLon = cos(lla[1]);
 
-    N = a / sqrt(1.0 - e * e * sinLat * sinLat);	//prime vertical radius of curvature
+    N = a / sqrt(1.0 - e * e * sinLat * sinLat);    //prime vertical radius of curvature
 
     ecef[0] = (N + lla[2]) * cosLat * cosLon;
     ecef[1] = (N + lla[2]) * cosLat * sinLon;
@@ -35,13 +35,13 @@ void lla_2_ecef(const double lla[3], // lat, lon, alt above ellipsoid [rad, rad,
 uint16_t ecef_2_lla(const double ecef[3], // earth centered earth fixed [m]
                     double lla[3])        // lat, lon, alt above ellipsoid [rad, rad, m]
 {
-  const double a = 6378137.0;	        // Equatorial Radius
-  const double e = 8.1819190842622e-2;	// Eccentricity
+  const double a = 6378137.0;           // Equatorial Radius
+  const double e = 8.1819190842622e-2;  // Eccentricity
   double x = ecef[0], y = ecef[1], z = ecef[2];
   double Lat, N, NplusH, delta, esLat;
   uint16_t iter;
 
-#define MAX_ITER 10		// should not take more than 5 for valid coordinates
+#define MAX_ITER 10     // should not take more than 5 for valid coordinates
 #define ACCURACY 1.0e-11
 
     lla[1] = atan2(y, x);
@@ -116,7 +116,7 @@ void quaternion_2_rpy(const float q[4], // quaternion
     R23 = 2.0f * (q[2] * q[3] + q[0] * q[1]);
     R33 = q0s - q1s - q2s + q3s;
 
-    rpy[1] = asinf(-R13);	// pitch always between -pi/2 to pi/2
+    rpy[1] = asinf(-R13);   // pitch always between -pi/2 to pi/2
     rpy[2] = atan2f(R12, R11);
     rpy[0] = atan2f(R23, R33);
 
@@ -149,7 +149,7 @@ void rpy_2_quaternion(const float rpy[3], // roll, pitch, yaw [rad]
     q[2] = cphi * stheta * cpsi + sphi * ctheta * spsi;
     q[3] = cphi * ctheta * spsi - sphi * stheta * cpsi;
 
-    if (q[0] < 0) 		// q0 always positive for uniqueness
+    if (q[0] < 0)       // q0 always positive for uniqueness
     {
         q[0] = -q[0];
         q[1] = -q[1];
@@ -223,7 +223,7 @@ void rpy_2_R(const float rpy[3], // roll, pitch, yaw [rad]
   float sF = sinf(rpy[0]), cF = cosf(rpy[0]);
   float sT = sinf(rpy[1]), cT = cosf(rpy[1]);
   float sP = sinf(rpy[2]), cP = cosf(rpy[2]);
-	
+    
     Rbe[0][0] = cT*cP;
     Rbe[0][1] = cT*sP;
     Rbe[0][2] = -sT;
