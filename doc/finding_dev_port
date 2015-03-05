@@ -1,0 +1,5 @@
+Store list of devices before pluging in new device
+ls /dev/ > dev_list_1.txt
+
+Then run this after you plug it:
+ls /dev/ | diff --suppress-common-lines -y - dev_list_1.txt

@@ -15,16 +15,17 @@ type_command ()
 
 # Define names of tabs to open.
 tab[0]="ssh1"
-tab[1]="bag"
-tab[2]="msn"
-tab[3]="ld"
-tab[4]="cvt"
-tab[5]="rqt"
-tab[6]="rpy"
-tab[7]="cp2h"
-tab[8]="cp2gs"
-tab[9]="git"
-tab[10]="eclipse"
+tab[1]="ssh2"
+tab[2]="bag"
+tab[3]="msn"
+tab[4]="ld"
+tab[5]="cvt"
+tab[6]="rqt"
+tab[7]="rpy"
+tab[8]="cp2h"
+tab[9]="cp2gs"
+#tab[10]="git"
+#tab[11]="eclipse"
 
 # IP of robot. Default to wireless.
 husky_ip="192.168.1.101" # wireless
@@ -60,6 +61,12 @@ do
     # Have to do everyone with xdotool so it executes in new tab.
     case  "${tab[i]}" in
         ssh1)
+            exec_command "echo -e \"\nroslaunch htp_auto guidance.launch --screen\n\""
+            type_command "ssh administrator@$husky_ip"
+            
+        ;;
+        ssh2)
+            exec_command "echo -e \"\nroslaunch htp_auto gps.launch port:=/dev/ttyUSB0 baud:=38400 --screen\n\""
             type_command "ssh administrator@$husky_ip"
         ;;
 	    bag)
@@ -95,7 +102,15 @@ do
 		    type_command "rosrun htp_auto quat_to_euler odom:=robot_pose_ekf/odom_combined rpy_odom:=odom_euler"
         ;;
         cp2h)
-		    exec_command "echo -e \"\nTo move htp package to husky\n\""
+        	inst0="To move entire workspace to husky:"
+            inst1="scp -pr ~/ros/. administrator@<HUSKY_IP>:/home/administrator/ros/"
+            inst2="You may first need to delete ~/ros ON HUSKY."
+		    inst3="OVER SSH:"
+		    inst4="rm -rf ~/ros"
+		    exec_command "echo -e \"\n\n${inst0}\n${inst1}\n${inst2}\n${inst3}\n${inst4}\n\""
+		    sleep 0.5
+
+		    exec_command "echo -e \"\n\nTo move just htp package to husky\n\""
             type_command "scp -pr ~/ros/src/htp_auto/. administrator@${husky_ip}:/home/administrator/ros/src/htp_auto"
         ;;
         cp2gs)

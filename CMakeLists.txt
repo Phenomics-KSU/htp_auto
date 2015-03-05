@@ -73,6 +73,7 @@ generate_messages(
 )
 
 generate_dynamic_reconfigure_options(
+  cfg/GPSConverterParams.cfg
   cfg/GuidanceParams.cfg
 )
 
@@ -110,6 +111,7 @@ add_executable(waypoint_guidance src/waypoint_guidance.cpp src/pid.cpp)
 add_executable(mission src/mission.cpp)
 add_executable(mission_loader src/mission_loader.cpp)
 add_executable(quat_to_euler src/quat_to_euler.cpp)
+add_executable(gps_converter src/gps_converter.cpp src/coordinate_conversions.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -118,6 +120,8 @@ add_dependencies(waypoint_guidance {PROJECT_NAME}_gencfg)
 add_dependencies(mission htp_auto_generate_messages_cpp)
 add_dependencies(mission_loader htp_auto_generate_messages_cpp)
 add_dependencies(quat_to_euler htp_auto_generate_messages_cpp)
+add_dependencies(gps_converter htp_auto_generate_messages_cpp)
+add_dependencies(gps_converter {PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(waypoint_guidance
@@ -133,6 +137,10 @@ target_link_libraries(mission_loader
 )
 
 target_link_libraries(quat_to_euler
+   ${catkin_LIBRARIES}
+)
+
+target_link_libraries(gps_converter
    ${catkin_LIBRARIES}
 )
 

@@ -1,0 +1,13 @@
+<launch>
+
+    <arg name="port" default="/dev/ttyUSB0"/>
+    <arg name="baud" default="38400"/>
+
+    <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver">
+        <param name="port" value="$(arg port)"/>
+        <param name="baud" value="$(arg baud)"/>
+    </node>
+
+	<node pkg="htp_auto" type="gps_converter" name="gps_converter"> </node>
+
+</launch>
