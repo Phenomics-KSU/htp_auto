@@ -72,7 +72,7 @@ do
 	    bag)
 	        inst0="After SSH:"
             inst1="cd ~/bags"
-            inst2="rosbag record -O your_file_name /robot_pose_ekf/odom_combined"
+            inst2="rosbag record -O your_file_name /robot_pose_ekf/odom_combined /home"
 		    inst3="press ctrl+C to stop"
 		    exec_command "echo -e \"\n\n${inst0}\n${inst1}\n${inst2}\n${inst3}\n\""
 		    sleep 0.5

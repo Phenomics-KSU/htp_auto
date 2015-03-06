@@ -5,7 +5,7 @@ To start recording data in a bag:
 4) when finished stop bagging with ctrl+C
 
 For example to log position data run
-rosbag record -O ashland_field_5 /robot_pose_ekf/odom_combined
+rosbag record -O ashland_field_5 /robot_pose_ekf/odom_combined /home
 
 And after your finished a bag file should be created called
 ~/bags/ashland_field_5.bag

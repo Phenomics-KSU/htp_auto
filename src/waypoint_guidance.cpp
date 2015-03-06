@@ -57,7 +57,6 @@ private: // types
         facing_target,
         traveling_to_target,
         closing_in_on_target,
-
     };
 
 public: // methods

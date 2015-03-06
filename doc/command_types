@@ -21,3 +21,14 @@ param4	: Acceptance Radius (meters)
 param5	: Stop at Target (true if nonzero)
 param6	: Unused
 param7	: Unused
+
+Command: Set Home
+type    : 1 
+param0  : Unused
+param1  : Home Latitude (degrees)
+param2  : Home Longitude (degrees)
+param3  : Home Altitude (meters)
+param4  : Unused
+param5  : Unused
+param6  : Unused
+param7  : Unused

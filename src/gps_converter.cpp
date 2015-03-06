@@ -2,12 +2,14 @@
 *  \author     Kyle McGahee <kmcgahee@ksu.edu>
 *
 *  \summary    Merges AVR and NavSatFix messages into single odometry message in ENU coordinate frame.
+*              also manages 'home' position that is origin of ENU frame.
 */
 
 // Standard Headers
 #include <iostream>
 #include <iomanip>
 #include <math.h>
+#include <string>
 
 // ROS Library Headers
 #include <ros/ros.h>
@@ -18,6 +20,8 @@
 #include <nmea_navsat_driver/AVR.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
+#include <htp_auto/SetHome.h>
+#include <htp_auto/Home.h>
 #include <htp_auto/GPSConverterParamsConfig.h>
 
 // Project Headers
@@ -25,10 +29,15 @@
 
 // Global so callbacks can use them. Only one thread so don't need to worry about locking.
 static ros::Publisher odom_pub;
+static ros::Publisher home_pub;
 static sensor_msgs::NavSatFix last_fix;
 
 // Flag representing if there's a valid home position set.
 static bool valid_home = false;
+
+// Rotation matrix from ECEF to NED associated with home position.
+// Only valid if 'valid_home' flag is set.
+static double Rne[3][3];
 
 // Dynamic reconfiguration variables.
 static double yaw_offset = 0;
@@ -37,11 +46,26 @@ static double min_sats = 0;
 static int8_t min_qual_ind = 0;
 static int8_t max_qual_ind = 0;
 
+// Conversion constants
+const double rad2deg = 180.0 / M_PI;
+const double deg2rad = M_PI / 180.0;
+
 // Updates ECEF->NED rotation matrix for input argument LLA[3] (rad, m)
-void setHomePosition(const double * lla, double Rne[3][3])
+// The 'source' string identifies who set the home position.
+void setHomePosition(const double * lla, const std::string & source)
 {
     Rne_from_lla(lla, Rne);
     valid_home = true;
+
+    htp_auto::Home home;
+    home.header.stamp = ros::Time::now();
+    home.header.frame_id = "home";
+    home.latitude = lla[0] * rad2deg;
+    home.longitude = lla[1] * rad2deg;
+    home.altitude = lla[2];
+    home.source = source;
+
+    home_pub.publish(home);
 }
 
 // Saves received message and lets AVR callback do all the checking and conversions.
@@ -57,9 +81,6 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 {
     // Timestamp of last satellite fix message that we used with last AVR message.
     static ros::Time last_used_fix_time;
-
-    // Rotation matrix from ECEF to NED. Static because it's associated with home position.
-    static double Rne[3][3];
 
     // If we don't have a new fix then don't use this AVR message.
     if (last_fix.header.stamp == last_used_fix_time)
@@ -104,8 +125,8 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     while (corrected_yaw < -M_PI) { corrected_yaw += 2 * M_PI; }
 
     // To convert to ENU first convert LLA to ECEF.
-    double lat_rad = last_fix.latitude * M_PI / 180.0;
-    double lon_rad = last_fix.longitude * M_PI / 180.0;
+    double lat_rad = last_fix.latitude * deg2rad;
+    double lon_rad = last_fix.longitude * deg2rad;
     double lla[] = { lat_rad, lon_rad, last_fix.altitude };
     double ecef[3];
     lla_2_ecef(lla, ecef);
@@ -113,7 +134,7 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     if (!valid_home)
     {
         ROS_INFO("Setting new home position.");
-        setHomePosition(lla, Rne);
+        setHomePosition(lla, "fix");
     }
 
     // Now convert from ECEF to NED using rotation matrix (Rne)
@@ -142,7 +163,7 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     case 1: /* Just have GPS fix */
         xy_position_cov = 5 * 5;
         z_position_cov = 8 * 8;
-        z_orientation_cov = 999999.0;
+        z_orientation_cov = 99999999.0;
         break;
     case 2: /* RTK float solution */
         xy_position_cov = 0.25 * 0.25;
@@ -157,12 +178,12 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     case 4: /* DGPS code-based solution */
         xy_position_cov = 2 * 2;
         z_position_cov = 4 * 4;
-        z_orientation_cov = 999999.0;
+        z_orientation_cov = 99999999.0;
         break;
     default:
-        xy_position_cov = 999999.0;
-        z_position_cov = 999999.0;
-        z_orientation_cov = 999999.0;
+        xy_position_cov = 99999999.0;
+        z_position_cov = 99999999.0;
+        z_orientation_cov = 99999999.0;
         break;
     }
 
@@ -186,10 +207,22 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 
 }
 
+// Sets new home position to the LLA specified in request.
+bool setHomeServiceCallback(htp_auto::SetHome::Request & request, htp_auto::SetHome::Response & response)
+{
+	double lat_rad = request.home.latitude * deg2rad;
+	double lon_rad = request.home.longitude * deg2rad;
+	double lla[] = { lat_rad, lon_rad, request.home.altitude };
+	std::string source = (request.home.source == "") ? "service" : request.home.source;
+
+	setHomePosition(lla, source);
+	return true;
+}
+
 // Should be called from reconfiguration server.
 void dynamicReconfigureCallback(htp_auto::GPSConverterParamsConfig & config, uint32_t level)
 {
-    yaw_offset = config.yaw_offset * M_PI / 180.0;
+    yaw_offset = config.yaw_offset * deg2rad;
     max_pdop = config.max_pdop;
     min_sats = config.min_sats;
     min_qual_ind = config.min_qual_ind;
@@ -205,7 +238,7 @@ bool resetHomeServiceCallback(std_srvs::Empty::Request & request, std_srvs::Empt
 int main(int argc, char **argv)
 {
     // Setup ROS node.
-    ros::init(argc, argv, "mission");
+    ros::init(argc, argv, "gps_converter");
 
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
@@ -213,7 +246,9 @@ int main(int argc, char **argv)
     ros::Subscriber avr_sub = nh.subscribe("avr", 1, AVRMessageReceived);
     ros::Subscriber nav_fix_sub = nh.subscribe("fix", 1, NavSatFixMessageReceived);
 
+    // Home publisher needs to be latched so log file can store it.
     odom_pub = nh.advertise<nav_msgs::Odometry>("gps", 5);
+    home_pub = nh.advertise<htp_auto::Home>("home", 1, /*latched*/true);
 
     // Setup reconfigure server to allow for parameter updates.
     // Setting the callback will initially call it will all the default values.

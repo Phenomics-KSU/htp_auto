@@ -21,6 +21,7 @@
 #include <htp_auto/WaypointGuidanceAction.h>
 #include <htp_auto/AddMissionItem.h>
 #include <htp_auto/SetMissionItem.h>
+#include <htp_auto/SetHome.h>
 
 using namespace htp_auto;
 
@@ -28,6 +29,7 @@ using namespace htp_auto;
 enum
 {
     MISSION_ITEM_WAYPOINT,
+	MISSION_ITEM_SET_HOME,
 };
 
 /**
@@ -50,11 +52,13 @@ class Mission
 public: // methods
 
     // Constructor
-    Mission() :
+    Mission(ros::NodeHandle & nh) :
         current_index_(0),
+		nh_(nh),
         guidance_client_("guidance", true /*create separate thread*/),
         started_(false)
     {
+    	set_home_client_ = nh.serviceClient<SetHome>("set_home");
     }
     
     // Executes all simple commands until either an action command is hit (in which case it's started) or there are no more commands.
@@ -116,7 +120,7 @@ public: // methods
             ROS_WARN("Mission command failed. Type ID: %d", current_item.type); 
             started_ = false;
         }
-                
+
         return success;
     }
     
@@ -225,6 +229,10 @@ private: // methods
                 is_action = true;
                 success = executeWaypoint(item);               
                 break;
+            case MISSION_ITEM_SET_HOME:
+            	is_action = false;
+            	success = executeSetHome(item);
+            	break;
             default:
                 success = false;
                 ROS_WARN("Unhandled mission item with type: %d", item.type);
@@ -245,18 +253,46 @@ private: // methods
 
         WaypointGuidanceGoal goal;
 
-        goal.frame = item.param0;
+        int32_t frame = item.param0;
         goal.target_x = item.param1;
         goal.target_y = item.param2;
         goal.acceptance_radius = item.param4;
         goal.stop_at_target = (item.param5 != 0.0);
+
+        /*switch (frame)
+        {
+        case FRAME_LOCAL:
+        	// This is what guidance client expects so don't need to do anything.
+        	break;
+        case FRAME_LLA:
+        	break;
+        case FRAME_UTM:
+        	break;
+        }*/
 
         guidance_client_.sendGoal(goal, boost::bind(&Mission::guidanceGoalCompleteCallback, this, _1, _2));
 
         return true; // successfully sent goal
     }
     
+    // Sets home position to LLA specified in item.  Returns true if successful.
+    bool executeSetHome(Command const & item)
+    {
+    	SetHome set_home;
+    	set_home.request.home.latitude = item.param1;
+    	set_home.request.home.longitude = item.param2;
+    	set_home.request.home.altitude = item.param3;
+    	set_home.request.home.source = "mission";
+
+    	bool success = set_home_client_.call(set_home);
+
+    	return success;
+    }
+
 private: // fields
+
+    // Used for subscriptions/publications/etc.
+    ros::NodeHandle & nh_;
 
     // List of command items to execute.
     std::vector<Command> items_;
@@ -264,6 +300,9 @@ private: // fields
     // Guidance client used to move vehicle to a waypoint location.
     actionlib::SimpleActionClient<WaypointGuidanceAction> guidance_client_;
     
+    // GPS Converter service client used to set home position.
+    ros::ServiceClient set_home_client_;
+
     // Command index (in items) that is currently being executed.
     uint32_t current_index_;
     
@@ -360,7 +399,7 @@ int main(int argc, char **argv)
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
     
-    Mission mission;  
+    Mission mission(nh);
 
     MissionServer mission_server(nh, mission);
     

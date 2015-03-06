@@ -47,6 +47,7 @@ find_package(catkin REQUIRED
 add_message_files(
   FILES
   Command.msg
+  Home.msg
   PIDState.msg
 )
 
@@ -56,6 +57,7 @@ add_service_files(
   AddMissionItem.srv
   LoadMissionFile.srv
   PID.srv
+  SetHome.srv
   SetMissionItem.srv
 )
 

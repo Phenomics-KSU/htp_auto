@@ -11,6 +11,7 @@ import os
 import math
 import argparse
 import rosbag
+from __builtin__ import True
 
 # ------------------------------------------------------
 # Helper classes/functions for split and merge algorithm
@@ -67,6 +68,22 @@ def extractPositionsFromBag(bag_file_path, position_topic):
     bag.close()
     
     return positions
+
+def extractHomePositionsFromBag(bag_file_path, home_topic):
+    '''Returns home positions from specified topic where each home element is a list'''
+    bag = rosbag.Bag(bag_file_path)
+
+    home_positions = []    
+    for topic, msg, t in bag.read_messages(topics=[home_topic]):
+        lat = msg.latitude
+        lon = msg.longitude
+        alt = msg.altitude
+        source = msg.source 
+        home_positions.append([lat, lon, alt, source])
+        
+    bag.close()
+    
+    return home_positions
 
 def simplifyPositions(positions, epsilon):
     '''Uses first two elements of positions to run split and merge. 
@@ -137,6 +154,33 @@ def convertPositionsToMissionItems(positions, radius):
     
     return mission_items
 
+def chooseHomePosition(home_positions):
+    
+    if len(home_positions) == 0:
+        print '\nWarning: no home position found to include in mission.'
+        return None
+
+    print '\nHome locations found in bag file:'
+    for i, position in enumerate(home_positions):
+        print "Index {0}: {1}".format(i, position)
+
+    valid_index = False
+    while not valid_index:    
+        index = raw_input('Enter index of home position to use for mission. -1 for none.')
+        try:
+            index = int(index)
+            if index >= -1 and index < len(home_positions):
+                valid_index = True
+            
+        except ValueError:
+            print 'Non-integer input'
+
+    if index == -1:
+        return None
+    else:
+        return home_positions[index]
+
+
 def writeMissionItemsToFile(mission_items, output_file_path):
     '''Creates (or overwrites) specified file and writes each item on a new CSV line.'''
     directory = os.path.dirname(output_file_path)
@@ -154,9 +198,9 @@ def writeMissionItemsToFile(mission_items, output_file_path):
     
     outfile.close()
 
-    return 
+    return
 
-def convertBagToMissionFile(bag_path, output_path, position_topic, epsilon, radius):
+def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius):
     '''Main function to simplify logged position data and write as waypoints to mission file.'''
     positions = extractPositionsFromBag(bag_path, position_topic)
     
@@ -178,6 +222,12 @@ def convertBagToMissionFile(bag_path, output_path, position_topic, epsilon, radi
     
     print 'Converted all positions to waypoints.'
     
+    home_positions = extractHomePositionsFromBag(bag_path, home_topic)
+
+    home_position = chooseHomePosition(home_positions)
+    if home_position is not None:
+        mission_items.insert(0, home_position)
+    
     writeMissionItemsToFile(mission_items, output_path)
     
     print 'Wrote mission file: {0}'.format(output_path)
@@ -191,6 +241,7 @@ if __name__ == '__main__':
     parser.add_argument('bag_file', help='path to bag file to convert')
     parser.add_argument('output_file', help='path to mission file to create')
     parser.add_argument('-p', dest='position_topic', default='/robot_pose_ekf/odom_combined', help='Name of topic to extract position from.')
+    parser.add_argument('-t', dest='home_topic', default='/home', help='Name of topic to extract home position from.')
     parser.add_argument('-e', dest='epsilon', default=.2, help='split threshold in meters. Smaller = more waypoints. Must be greater than 0')
     parser.add_argument('-a', dest='radius', default=0, help='Acceptance radius of every waypoint.')
     args = parser.parse_args()
@@ -198,6 +249,7 @@ if __name__ == '__main__':
     bag_path = args.bag_file
     output_path = args.output_file
     position_topic = args.position_topic
+    home_topic = args.home_topic
     epsilon = float(args.epsilon)
     radius = float(args.radius)
     
@@ -206,7 +258,7 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
         
-    success = convertBagToMissionFile(bag_path, output_path, position_topic, epsilon, radius)
+    success = convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius)
         
     if success: 
         print 'Success\n'
