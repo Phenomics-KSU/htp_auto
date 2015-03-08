@@ -4,9 +4,9 @@
         <remap from="imu_data" to="imu/data" />
         <remap from="odom" to="encoder" />
         <rosparam>
-            freq: 30.0
+            freq: 20.0
             sensor_timeout: 1.0
-            publish_tf: false
+            publish_tf: true
             odom_used: true
             imu_used: true
             vo_used: false

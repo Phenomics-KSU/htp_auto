@@ -102,15 +102,15 @@ do
 		    type_command "rosrun htp_auto quat_to_euler odom:=robot_pose_ekf/odom_combined rpy_odom:=odom_euler"
         ;;
         cp2h)
-        	inst0="To move entire workspace to husky:"
-            inst1="scp -pr ~/ros/. administrator@<HUSKY_IP>:/home/administrator/ros/"
-            inst2="You may first need to delete ~/ros ON HUSKY."
-		    inst3="OVER SSH:"
-		    inst4="rm -rf ~/ros"
-		    exec_command "echo -e \"\n\n${inst0}\n${inst1}\n${inst2}\n${inst3}\n${inst4}\n\""
-		    sleep 0.5
+        	#inst0="To move entire workspace to husky:"
+            #inst1="scp -pr ~/ros/. administrator@<HUSKY_IP>:/home/administrator/ros/"
+            #inst2="You may first need to delete ~/ros ON HUSKY."
+		    #inst3="OVER SSH:"
+		    #inst4="rm -rf ~/ros"
+		    #exec_command "echo -e \"\n\n${inst0}\n${inst1}\n${inst2}\n${inst3}\n${inst4}\n\""
+		    #sleep 0.5
 
-		    exec_command "echo -e \"\n\nTo move just htp package to husky\n\""
+		    exec_command "echo -e \"\n\nTo move htp package to husky\n\""
             type_command "scp -pr ~/ros/src/htp_auto/. administrator@${husky_ip}:/home/administrator/ros/src/htp_auto"
         ;;
         cp2gs)
