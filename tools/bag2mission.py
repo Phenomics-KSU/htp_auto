@@ -166,7 +166,7 @@ def chooseHomePosition(home_positions):
 
     valid_index = False
     while not valid_index:    
-        index = raw_input('Enter index of home position to use for mission. -1 for none.')
+        index = raw_input('Enter index of home position to use for mission. -1 for none.  ')
         try:
             index = int(index)
             if index >= -1 and index < len(home_positions):
@@ -180,6 +180,15 @@ def chooseHomePosition(home_positions):
     else:
         return home_positions[index]
 
+def convertHomeToSetCommand(home_position):
+    
+    type = 1
+    x = home_position[0]
+    y = home_position[1]
+    z = home_position[2]
+        
+    set_home_command = [type, 0, x, y, z, 0, 0, 0, 0]
+    return set_home_command
 
 def writeMissionItemsToFile(mission_items, output_file_path):
     '''Creates (or overwrites) specified file and writes each item on a new CSV line.'''
@@ -226,7 +235,8 @@ def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, e
 
     home_position = chooseHomePosition(home_positions)
     if home_position is not None:
-        mission_items.insert(0, home_position)
+        set_home_command = convertHomeToSetCommand(home_position)
+        mission_items.insert(0, set_home_command)
     
     writeMissionItemsToFile(mission_items, output_path)
     

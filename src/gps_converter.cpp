@@ -85,6 +85,8 @@ void setHomePosition(const double * lla, const std::string & source)
     home.source = source;
 
     home_pub.publish(home);
+
+    ROS_INFO_STREAM("New home set from source " << source);
 }
 
 // Saves received message and lets AVR callback do all the checking and conversions.
@@ -160,7 +162,6 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 
     if (!valid_home)
     {
-        ROS_INFO("Setting new home position.");
         setHomePosition(lla, "fix");
     }
 
@@ -320,6 +321,7 @@ int main(int argc, char **argv)
     dynamic_reconfigure::Server<htp_auto::GPSConverterParamsConfig> config_server;
     config_server.setCallback(dynamicReconfigureCallback);
 
+    ros::ServiceServer set_home_service = nh.advertiseService("set_home", setHomeServiceCallback);
     ros::ServiceServer reset_home_service = nh.advertiseService("reset_home", resetHomeServiceCallback);
 
     // Wait for callbacks.
