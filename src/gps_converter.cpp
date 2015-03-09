@@ -34,6 +34,8 @@ static ros::Publisher odom_pub;
 static ros::Publisher home_pub;
 static sensor_msgs::NavSatFix last_fix;
 
+// **NOTE** right now home is position of primary antenna
+
 // Flag representing if there's a valid home position set.
 static bool valid_home = false;
 
@@ -181,7 +183,13 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     enu[1] = northing - utm_home[1];
     enu[2] = last_fix.altitude - utm_home[2];
 
-    ROS_INFO_STREAM_THROTTLE(5, "ENU: " << enu[0] << ", " << enu[1] << ", " << enu[2]);
+    // Take into account the fact the robot is in between the two antennas and the
+    // reported lat/lon is only for the primary receiver (which we mount on the right)
+    double ant1_offset = message.range / 2.0; // antenna 1 offset in meters
+    enu[0] += -sin(corrected_yaw) * ant1_offset; // easting
+    enu[1] += cos(corrected_yaw) * ant1_offset;  // northing
+
+    //ROS_INFO_STREAM_THROTTLE(1, "ENU: " << enu[0] << ", " << enu[1] << ", " << enu[2]);
 
     // TODO: handle this better or stop using UTM
     if (zone != utm_home_zone)
