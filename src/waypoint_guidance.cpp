@@ -21,6 +21,7 @@
 #include <geometry_msgs/Twist.h>
 #include <htp_auto/WaypointGuidanceAction.h>
 #include <htp_auto/GuidanceParamsConfig.h>
+#include <nav_msgs/Odometry.h>
 
 // HTP Package Headers
 #include "pid.h"
@@ -361,7 +362,7 @@ public: // methods
     {
         velocity_publisher_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel", 20);
     
-        pose_subscriber_ = nh_.subscribe("robot/pose", 20,  &WaypointGuidanceAction::poseMessageReceived, this);
+        pose_subscriber_ = nh_.subscribe("gps", 20,  &WaypointGuidanceAction::gpsMessageReceived, this);
 
         goal_periodic_timer_ = nh_.createTimer(ros::Duration(.5), &WaypointGuidanceAction::goalPeriodicTimerCallback, this);
         
@@ -371,7 +372,7 @@ public: // methods
         server_.start();
     }
 
-    void poseMessageReceived(const geometry_msgs::PoseWithCovarianceStamped & message)
+    void gpsMessageReceived(const nav_msgs::Odometry & message)
     {
         if (server_.isActive() && !reached_target_)
         {
