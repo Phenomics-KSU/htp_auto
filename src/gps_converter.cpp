@@ -20,12 +20,14 @@
 #include <nmea_navsat_driver/AVR.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
+#include <tf/transform_datatypes.h>
 #include <htp_auto/SetHome.h>
 #include <htp_auto/Home.h>
 #include <htp_auto/GPSConverterParamsConfig.h>
 
 // Project Headers
 #include "coordinate_conversions.h"
+#include "utm_conversions.h"
 
 // Global so callbacks can use them. Only one thread so don't need to worry about locking.
 static ros::Publisher odom_pub;
@@ -38,6 +40,11 @@ static bool valid_home = false;
 // Rotation matrix from ECEF to NED associated with home position.
 // Only valid if 'valid_home' flag is set.
 static double Rne[3][3];
+
+// Home representation for UTM method
+// Easting/Northing/Altitude all in meters
+static double utm_home[3];
+static std::string utm_home_zone;
 
 // Dynamic reconfiguration variables.
 static double yaw_offset = 0;
@@ -56,6 +63,16 @@ void setHomePosition(const double * lla, const std::string & source)
 {
     Rne_from_lla(lla, Rne);
     valid_home = true;
+
+    // For second method using UTM
+    double lat_deg = lla[0] * rad2deg;
+    double lon_deg = lla[1] * rad2deg;
+    double altitude = lla[2];
+    double northing, easting;
+    gps_common::LLtoUTM(lat_deg, lon_deg, northing, easting, utm_home_zone);
+    utm_home[0] = easting;
+    utm_home[1] = northing;
+    utm_home[2] = altitude;
 
     htp_auto::Home home;
     home.header.stamp = ros::Time::now();
@@ -104,15 +121,20 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 
     if (!pdop_ok || !num_sats_ok || !quality_ok)
     {
-        ROS_WARN_STREAM_THROTTLE(2, std::setprecision(2) << std::fixed << "GPS Checks Failed: "
-                << message.pdop << ", " << message.sats_used << ", " << message.gps_quality
-                << " Status: " << pdop_ok << num_sats_ok << quality_ok);
+    	// Copy into standard types to display properly.
+    	double pdop = message.pdop;
+    	int sats_used = message.sats_used;
+    	int gps_quality = message.gps_quality;
+        ROS_WARN_STREAM_THROTTLE(2, "GPS Checks Failed");
+        ROS_WARN_STREAM_THROTTLE(2, "PDOP: " << pdop << " SATS: " << sats_used << " QUAL: " << gps_quality);
+        ROS_WARN_STREAM_THROTTLE(2, "Status: " << pdop_ok << num_sats_ok << quality_ok);
         return;
     }
 
     // Need to add in offset due to antenna configuration.  For example in a 'roll' mount configuration
     // the heading would read 90 degrees when facing north.
-    double corrected_yaw = message.yaw - yaw_offset;
+    double measured_yaw = message.yaw_deg * deg2rad;
+    double corrected_yaw = measured_yaw - yaw_offset;
 
     // Need to flip sign since in ENU we should increase CCW but bx982 measures CW
     corrected_yaw *= -1.0;
@@ -131,6 +153,9 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     double ecef[3];
     lla_2_ecef(lla, ecef);
 
+    //ROS_INFO_STREAM_THROTTLE(5, "LLA:  " << lla[0] << ", " << lla[1] << ", " << lla[2]);
+    //ROS_INFO_STREAM_THROTTLE(5, "ECEF: " << ecef[0] << ", " << ecef[1] << ", " << ecef[2]);
+
     if (!valid_home)
     {
         ROS_INFO("Setting new home position.");
@@ -141,8 +166,28 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     double ned[3];
     rot_mult(Rne, ecef, ned, false);
 
+    //ROS_INFO_STREAM_THROTTLE(5, "NED:  " << ned[0] << ", " << ned[1] << ", " << ned[2]);
+
     // Finally convert from NED to ENU since that's the standard in ROS.
     double enu[3] = { ned[1], ned[0], -ned[2] };
+
+    // Find ENU using UTM method since above method isn't working.
+    double northing, easting;
+    std::string zone;
+    gps_common::LLtoUTM(last_fix.latitude, last_fix.longitude, northing, easting, zone);
+
+    // Override ENU above with offset from home UTM
+    enu[0] = easting - utm_home[0];
+    enu[1] = northing - utm_home[1];
+    enu[2] = last_fix.altitude - utm_home[2];
+
+    ROS_INFO_STREAM_THROTTLE(5, "ENU: " << enu[0] << ", " << enu[1] << ", " << enu[2]);
+
+    // TODO: handle this better or stop using UTM
+    if (zone != utm_home_zone)
+    {
+    	ROS_ERROR("CHANGED UTM ZONES!!!");
+    }
 
     // Fill in odom data.  Use same time stamp as AVR message since that's when the measurement was made.
     nav_msgs::Odometry odom;
@@ -151,7 +196,13 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     odom.pose.pose.position.x = enu[0];
     odom.pose.pose.position.y = enu[1];
     odom.pose.pose.position.z = enu[2];
-    odom.pose.pose.orientation.z = corrected_yaw;
+
+    // Convert yaw to quaternion before storing in message.
+    tf::Quaternion corrected_quat = tf::createQuaternionFromRPY(0, 0, corrected_yaw);
+    odom.pose.pose.orientation.x = corrected_quat.getX();
+    odom.pose.pose.orientation.y = corrected_quat.getY();
+    odom.pose.pose.orientation.z = corrected_quat.getZ();
+    odom.pose.pose.orientation.w = corrected_quat.getW();
 
     // Set covariance depending on GPS solution type.
     double xy_position_cov = -1;
@@ -169,11 +220,17 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
         xy_position_cov = 0.25 * 0.25;
         z_position_cov = .4 * .4;
         z_orientation_cov = .035 * .035; // .035 = 2 deg
+
+        // Make really small so filter uses this.
+        z_orientation_cov /= 1000000.0;
         break;
     case 3: /* RTK fix solution */
         xy_position_cov = .01 * .01;
         z_position_cov = .02 * .02;
         z_orientation_cov = .0017 * .0017; // .0017 = .1 deg
+
+        // Make really small so filter uses this.
+        z_orientation_cov /= 10000.0;
         break;
     case 4: /* DGPS code-based solution */
         xy_position_cov = 2 * 2;

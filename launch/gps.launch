@@ -2,10 +2,12 @@
 
     <arg name="port" default="/dev/ttyS0"/>
     <arg name="baud" default="38400"/>
+    <arg name="test_file" default=""/>
 
     <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver">
         <param name="port" value="$(arg port)"/>
         <param name="baud" value="$(arg baud)"/>
+        <param name="test_file" value="$(arg test_file)"/>
     </node>
 
     <node pkg="htp_auto" type="gps_converter" name="gps_converter"> </node>

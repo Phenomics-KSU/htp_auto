@@ -99,7 +99,7 @@ do
         ;;
         rpy)
             exec_command "export ROS_MASTER_URI=http://${husky_ip}:11311"
-		    type_command "rosrun htp_auto quat_to_euler odom:=robot_pose_ekf/odom_combined rpy_odom:=odom_euler"
+		    type_command "rosrun htp_auto quat_to_euler pose_wcs:=robot_pose_ekf/odom_combined rpy_pose_wcs:=odom_euler"
         ;;
         cp2h)
         	#inst0="To move entire workspace to husky:"

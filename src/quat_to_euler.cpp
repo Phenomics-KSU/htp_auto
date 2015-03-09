@@ -10,11 +10,15 @@ Conversion from a quaternion to roll, pitch and yaw.
 #include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/Quaternion.h"
 #include "geometry_msgs/Pose.h"
+#include "geometry_msgs/PoseWithCovariance.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
+#include "nav_msgs/Odometry.h"
 #include "tf/transform_datatypes.h"
 
 ros::Publisher quat_rpy_publisher;
-ros::Publisher imu_rpy_publisher;
+ros::Publisher pose_rpy_publisher;
+ros::Publisher pose_wc_rpy_publisher; // wc = with covariance
+ros::Publisher pose_wcs_rpy_publisher; // wcs = with covariance stamped
 ros::Publisher odom_rpy_publisher;
 
 // Converts quaternion to roll pitch yaw vector
@@ -40,14 +44,28 @@ void QuatMsgCallback(const geometry_msgs::Quaternion msg)
     quat_rpy_publisher.publish(rpy);
 }
 
-void IMUMsgCallback(const geometry_msgs::Pose msg)
+void PoseMsgCallback(const geometry_msgs::Pose msg)
 {
     geometry_msgs::Vector3 rpy;
     convert(msg.orientation, rpy);
-    imu_rpy_publisher.publish(rpy);
+    pose_rpy_publisher.publish(rpy);
 }
 
-void OdomMsgCallback(const geometry_msgs::PoseWithCovarianceStamped msg)
+void PoseWCMsgCallback(const geometry_msgs::PoseWithCovariance msg)
+{
+    geometry_msgs::Vector3 rpy;
+    convert(msg.pose.orientation, rpy);
+    pose_wc_rpy_publisher.publish(rpy);
+}
+
+void PoseWCSMsgCallback(const geometry_msgs::PoseWithCovarianceStamped msg)
+{
+    geometry_msgs::Vector3 rpy;
+    convert(msg.pose.pose.orientation, rpy);
+    pose_wcs_rpy_publisher.publish(rpy);
+}
+
+void OdomMsgCallback(const nav_msgs::Odometry msg)
 {
     geometry_msgs::Vector3 rpy;
     convert(msg.pose.pose.orientation, rpy);
@@ -60,14 +78,18 @@ int main(int argc, char **argv)
 
     ros::NodeHandle n;
 
-    quat_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_quat", 200);
-    imu_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_imu", 200);
-    odom_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_odom", 200);
+    quat_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_quat", 50);
+    pose_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_pose", 50);
+    pose_wc_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_pose_wc", 50);
+    pose_wcs_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_pose_wcs", 50);
+    odom_rpy_publisher = n.advertise<geometry_msgs::Vector3>("rpy_odom", 50);
 
     // Subscribe to topics that contain quaternion fields or is a quaternion message
-    ros::Subscriber quat_subscriber = n.subscribe("quat", 200, QuatMsgCallback);
-    ros::Subscriber imu_subscriber = n.subscribe("imu", 200, IMUMsgCallback);
-    ros::Subscriber odom_subscriber = n.subscribe("odom", 200, OdomMsgCallback);
+    ros::Subscriber quat_subscriber = n.subscribe("quat", 50, QuatMsgCallback);
+    ros::Subscriber pose_subscriber = n.subscribe("pose", 50, PoseMsgCallback);
+    ros::Subscriber pose_wc_subscriber = n.subscribe("pose_wc", 50, PoseWCMsgCallback);
+    ros::Subscriber pose_wcs_subscriber = n.subscribe("pose_wcs", 50, PoseWCSMsgCallback);
+    ros::Subscriber odom_subscriber = n.subscribe("odom", 50, OdomMsgCallback);
 
     ros::spin(); // wait for callbacks
 
