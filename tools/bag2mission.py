@@ -253,7 +253,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', dest='position_topic', default='/robot_pose_ekf/odom_combined', help='Name of topic to extract position from.')
     parser.add_argument('-t', dest='home_topic', default='/home', help='Name of topic to extract home position from.')
     parser.add_argument('-e', dest='epsilon', default=.2, help='split threshold in meters. Smaller = more waypoints. Must be greater than 0')
-    parser.add_argument('-a', dest='radius', default=0, help='Acceptance radius of every waypoint.')
+    parser.add_argument('-a', dest='radius', default=.5, help='Acceptance radius of every waypoint.')
     args = parser.parse_args()
     
     bag_path = args.bag_file
