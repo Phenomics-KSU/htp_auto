@@ -126,10 +126,10 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 
     if (!pdop_ok || !num_sats_ok || !quality_ok)
     {
-    	// Copy into standard types to display properly.
-    	double pdop = message.pdop;
-    	int sats_used = message.sats_used;
-    	int gps_quality = message.gps_quality;
+        // Copy into standard types to display properly.
+        double pdop = message.pdop;
+        int sats_used = message.sats_used;
+        int gps_quality = message.gps_quality;
         ROS_WARN_STREAM_THROTTLE(2, "GPS Checks Failed");
         ROS_WARN_STREAM_THROTTLE(2, "PDOP: " << pdop << " SATS: " << sats_used << " QUAL: " << gps_quality);
         ROS_WARN_STREAM_THROTTLE(2, "Status: " << pdop_ok << num_sats_ok << quality_ok);
@@ -196,7 +196,7 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     // TODO: handle this better or stop using UTM
     if (zone != utm_home_zone)
     {
-    	ROS_ERROR("CHANGED UTM ZONES!!!");
+        ROS_ERROR("CHANGED UTM ZONES!!!");
     }
 
     // Fill in odom data.  Use same time stamp as AVR message since that's when the measurement was made.
@@ -277,13 +277,13 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 // Sets new home position to the LLA specified in request.
 bool setHomeServiceCallback(htp_auto::SetHome::Request & request, htp_auto::SetHome::Response & response)
 {
-	double lat_rad = request.home.latitude * deg2rad;
-	double lon_rad = request.home.longitude * deg2rad;
-	double lla[] = { lat_rad, lon_rad, request.home.altitude };
-	std::string source = (request.home.source == "") ? "service" : request.home.source;
+    double lat_rad = request.home.latitude * deg2rad;
+    double lon_rad = request.home.longitude * deg2rad;
+    double lla[] = { lat_rad, lon_rad, request.home.altitude };
+    std::string source = (request.home.source == "") ? "service" : request.home.source;
 
-	setHomePosition(lla, source);
-	return true;
+    setHomePosition(lla, source);
+    return true;
 }
 
 // Should be called from reconfiguration server.
@@ -317,7 +317,7 @@ bool ConvertLLAToENUServiceCallback(htp_auto::ConvertLLA2ENU::Request & request,
 
     if (zone != utm_home_zone)
     {
-    	ROS_ERROR("Cannot convert Lat/Lon because in different zone than home position.");
+        ROS_ERROR("Cannot convert Lat/Lon because in different zone than home position.");
     }
 
     response.east = easting - utm_home[0];

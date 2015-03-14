@@ -30,7 +30,7 @@ using namespace htp_auto;
 enum
 {
     MISSION_ITEM_WAYPOINT,
-	MISSION_ITEM_SET_HOME,
+    MISSION_ITEM_SET_HOME,
 };
 
 // Corresponds to 'frame' field of Command message.
@@ -62,12 +62,12 @@ public: // methods
     // Constructor
     Mission(ros::NodeHandle & nh) :
         current_index_(0),
-		nh_(nh),
+        nh_(nh),
         guidance_client_("guidance", true /*create separate thread*/),
         started_(false)
     {
-    	set_home_client_ = nh.serviceClient<SetHome>("set_home");
-    	convert_lla_2_enu_client_ = nh.serviceClient<ConvertLLA2ENU>("lla_2_enu");
+        set_home_client_ = nh.serviceClient<SetHome>("set_home");
+        convert_lla_2_enu_client_ = nh.serviceClient<ConvertLLA2ENU>("lla_2_enu");
     }
     
     // Executes all simple commands until either an action command is hit (in which case it's started) or there are no more commands.
@@ -239,9 +239,9 @@ private: // methods
                 success = executeWaypoint(item);               
                 break;
             case MISSION_ITEM_SET_HOME:
-            	is_action = false;
-            	success = executeSetHome(item);
-            	break;
+                is_action = false;
+                success = executeSetHome(item);
+                break;
             default:
                 success = false;
                 ROS_WARN("Unhandled mission item with type: %d", item.type);
@@ -267,27 +267,27 @@ private: // methods
         switch (frame)
         {
         case FRAME_LOCAL:
-        	// This is what guidance client expects so don't need to do any conversions.
-        	x = item.param1;
-        	y = item.param2;
-        	break;
+            // This is what guidance client expects so don't need to do any conversions.
+            x = item.param1;
+            y = item.param2;
+            break;
         case FRAME_LLA:
-        	ConvertLLA2ENU conversion;
-        	conversion.request.latitude = item.param1;
-        	conversion.request.longitude = item.param2;
-        	conversion.request.altitude = item.param3;
-        	bool success = convert_lla_2_enu_client_.call(conversion);
+            ConvertLLA2ENU conversion;
+            conversion.request.latitude = item.param1;
+            conversion.request.longitude = item.param2;
+            conversion.request.altitude = item.param3;
+            bool success = convert_lla_2_enu_client_.call(conversion);
 
-        	if (!success)
-			{
-				ROS_WARN("Could not convert LLA waypoint to ENU.");
-				return false;
-			}
+            if (!success)
+            {
+                ROS_WARN("Could not convert LLA waypoint to ENU.");
+                return false;
+            }
 
-        	x = conversion.response.east;
-        	y = conversion.response.north;
+            x = conversion.response.east;
+            y = conversion.response.north;
 
-        	break;
+            break;
         }
 
         WaypointGuidanceGoal goal;
@@ -304,15 +304,15 @@ private: // methods
     // Sets home position to LLA specified in item.  Returns true if successful.
     bool executeSetHome(Command const & item)
     {
-    	SetHome set_home;
-    	set_home.request.home.latitude = item.param1;
-    	set_home.request.home.longitude = item.param2;
-    	set_home.request.home.altitude = item.param3;
-    	set_home.request.home.source = "mission";
+        SetHome set_home;
+        set_home.request.home.latitude = item.param1;
+        set_home.request.home.longitude = item.param2;
+        set_home.request.home.altitude = item.param3;
+        set_home.request.home.source = "mission";
 
-    	bool success = set_home_client_.call(set_home);
+        bool success = set_home_client_.call(set_home);
 
-    	return success;
+        return success;
     }
 
 private: // fields
