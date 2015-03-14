@@ -1,12 +1,11 @@
-# goal
-int32 frame
+# goal in same frame as measured position.
 float64 target_x
 float64 target_y
-float64 acceptance_radius
+float64 acceptance_radius # meters
 bool stop_at_target
 ---
 # result
-float64 distance_remaining
+float64 distance_remaining # meters
 ---
 # feedback
-float64 distance_remaining
+float64 distance_remaining # meters

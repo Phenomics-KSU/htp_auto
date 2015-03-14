@@ -1,0 +1,7 @@
+float64 latitude  # degrees
+float64 longitude # degrees
+float64 altitude  # AMSL meters
+---
+float64 east  # meters
+float64 north # meters
+float64 up    # meters

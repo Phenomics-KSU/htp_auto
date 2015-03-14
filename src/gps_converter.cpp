@@ -24,6 +24,7 @@
 #include <htp_auto/SetHome.h>
 #include <htp_auto/Home.h>
 #include <htp_auto/GPSConverterParamsConfig.h>
+#include <htp_auto/ConvertLLA2ENU.h>
 
 // Project Headers
 #include "coordinate_conversions.h"
@@ -301,6 +302,29 @@ bool resetHomeServiceCallback(std_srvs::Empty::Request & request, std_srvs::Empt
     valid_home = false;
 }
 
+// Allows other tasks to convert Lat/Lon to local coordinates.  Returns false on failure.
+bool ConvertLLAToENUServiceCallback(htp_auto::ConvertLLA2ENU::Request & request, htp_auto::ConvertLLA2ENU::Response & response)
+{
+    if (!valid_home)
+    {
+        ROS_WARN("Cannot convert Lat/Lon. No home set.");
+        return false;
+    }
+
+    double northing, easting;
+    std::string zone;
+    gps_common::LLtoUTM(request.latitude, request.longitude, northing, easting, zone);
+
+    if (zone != utm_home_zone)
+    {
+    	ROS_ERROR("Cannot convert Lat/Lon because in different zone than home position.");
+    }
+
+    response.east = easting - utm_home[0];
+    response.north = northing - utm_home[1];
+    response.up = request.altitude - utm_home[2];
+}
+
 int main(int argc, char **argv)
 {
     // Setup ROS node.
@@ -323,6 +347,7 @@ int main(int argc, char **argv)
 
     ros::ServiceServer set_home_service = nh.advertiseService("set_home", setHomeServiceCallback);
     ros::ServiceServer reset_home_service = nh.advertiseService("reset_home", resetHomeServiceCallback);
+    ros::ServiceServer lla_2_enu_service = nh.advertiseService("lla_2_enu", ConvertLLAToENUServiceCallback);
 
     // Wait for callbacks.
     ros::spin();

@@ -22,6 +22,7 @@
 #include <htp_auto/AddMissionItem.h>
 #include <htp_auto/SetMissionItem.h>
 #include <htp_auto/SetHome.h>
+#include <htp_auto/ConvertLLA2ENU.h>
 
 using namespace htp_auto;
 
@@ -30,6 +31,13 @@ enum
 {
     MISSION_ITEM_WAYPOINT,
 	MISSION_ITEM_SET_HOME,
+};
+
+// Corresponds to 'frame' field of Command message.
+enum
+{
+    FRAME_LOCAL,
+    FRAME_LLA,
 };
 
 /**
@@ -59,6 +67,7 @@ public: // methods
         started_(false)
     {
     	set_home_client_ = nh.serviceClient<SetHome>("set_home");
+    	convert_lla_2_enu_client_ = nh.serviceClient<ConvertLLA2ENU>("lla_2_enu");
     }
     
     // Executes all simple commands until either an action command is hit (in which case it's started) or there are no more commands.
@@ -251,24 +260,41 @@ private: // methods
             return false;
         }
 
-        WaypointGuidanceGoal goal;
-
+        // Set desired X and Y depending on frame.
         int32_t frame = item.param0;
-        goal.target_x = item.param1;
-        goal.target_y = item.param2;
-        goal.acceptance_radius = item.param4;
-        goal.stop_at_target = (item.param5 != 0.0);
+        double x = 0, y = 0;
 
-        /*switch (frame)
+        switch (frame)
         {
         case FRAME_LOCAL:
-        	// This is what guidance client expects so don't need to do anything.
+        	// This is what guidance client expects so don't need to do any conversions.
+        	x = item.param1;
+        	y = item.param2;
         	break;
         case FRAME_LLA:
+        	ConvertLLA2ENU conversion;
+        	conversion.request.latitude = item.param1;
+        	conversion.request.longitude = item.param2;
+        	conversion.request.altitude = item.param3;
+        	bool success = convert_lla_2_enu_client_.call(conversion);
+
+        	if (!success)
+			{
+				ROS_WARN("Could not convert LLA waypoint to ENU.");
+				return false;
+			}
+
+        	x = conversion.response.east;
+        	y = conversion.response.north;
+
         	break;
-        case FRAME_UTM:
-        	break;
-        }*/
+        }
+
+        WaypointGuidanceGoal goal;
+        goal.target_x = x;
+        goal.target_y = y;
+        goal.acceptance_radius = item.param4;
+        goal.stop_at_target = (item.param5 != 0.0);
 
         guidance_client_.sendGoal(goal, boost::bind(&Mission::guidanceGoalCompleteCallback, this, _1, _2));
 
@@ -302,6 +328,9 @@ private: // fields
     
     // GPS Converter service client used to set home position.
     ros::ServiceClient set_home_client_;
+
+    // Service client used to get ENU of specified LLA waypoints.
+    ros::ServiceClient convert_lla_2_enu_client_;
 
     // Command index (in items) that is currently being executed.
     uint32_t current_index_;

@@ -55,6 +55,7 @@ add_message_files(
 add_service_files(
   FILES
   AddMissionItem.srv
+  ConvertLLA2ENU.srv
   LoadMissionFile.srv
   PID.srv
   SetHome.srv
