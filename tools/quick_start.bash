@@ -72,7 +72,7 @@ do
 	    bag)
 	        inst0="After SSH:"
             inst1="cd ~/bags"
-            inst2="rosbag record -O your_file_name /robot_pose_ekf/odom_combined /home"
+            inst2="rosbag record -O your_file_name /gps /home"
 		    inst3="press ctrl+C to stop"
 		    exec_command "echo -e \"\n\n${inst0}\n${inst1}\n${inst2}\n${inst3}\n\""
 		    sleep 0.5
@@ -111,11 +111,11 @@ do
 		    #sleep 0.5
 
 		    exec_command "echo -e \"\n\nTo move htp package to husky\n\""
-            type_command "scp -pr ~/ros/src/htp_auto/. administrator@${husky_ip}:/home/administrator/ros/src/htp_auto"
+            type_command "scp -r ~/ros/src/htp_auto/. administrator@${husky_ip}:/home/administrator/ros/src/htp_auto"
         ;;
         cp2gs)
 		    exec_command "echo -e \"\nTo move log file back from husky\n\""
-		    type_command "scp -p administrator@"${husky_ip}":/home/administrator/bags/your_file.bag ~/bags/your_file.bag"
+		    type_command "scp administrator@"${husky_ip}":/home/administrator/bags/your_file.bag ~/bags/your_file.bag"
         ;;
         git)
             exec_command "cd ~/ros/src/htp_auto"
