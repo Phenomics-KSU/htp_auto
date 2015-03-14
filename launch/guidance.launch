@@ -1,7 +1,7 @@
 <launch>
 
     <node pkg="htp_auto" type="waypoint_guidance" name="guidance">
-        <remap from="cmd_vel" to="plan_cmd_vel" />
+        <remap from="cmd_vel" to="husky/cmd_vel" />
         <remap from="robot/pose" to="robot_pose_ekf/odom_combined" />
     </node>
         
