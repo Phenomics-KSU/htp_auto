@@ -1,0 +1,11 @@
+What does /husky/data/system_status represent?
+
+Voltages: [battery voltage, left motor driver, right motor driver]
+Currents: [total draw, left motor driver current, right motor driver current]
+Temperatures: [Left motor driver temp, right motor driver temp, left motor temp, right motor temp]
+
+The total current draw does not include the motors drivers; it is the current consumed by the MCU and user power ports. Husky’s motors are rated to draw 8A continuous, but they will spike to several times this, particularly when traversing rough terrain and when turning on the spot. To reduce current draw, consider commanding wider-radius turns from your control software.
+
+The temperature is measured in the motor drivers and on the motor casings; the coils inside the motor casings cannot be measured. Therefore, it is important to note that the temperature measured on the motor casings is a lagging indicator of the temperature of the coils inside the casing. Be aware of the delay in heat propagation on the motors during heavy use. The thermal limit of the system is 50, and the system will shut down if this limit is reached
+
+Monitoring these fields over longer periods of operation will allow you to ensure that you are not putting excessive wear on the motors.

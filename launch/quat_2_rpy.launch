@@ -1,0 +1,13 @@
+<launch>
+
+    <node pkg="htp_auto" type="quat_to_euler" name="gps_q2e">
+        <remap from="odom" to="gps" />
+        <remap from="rpy_odom" to="gps_rpy" />
+    </node>
+    
+    <node pkg="htp_auto" type="quat_to_euler" name="odom_q2e">
+        <remap from="pose_wcs" to="robot_pose_ekf/odom_combined" />
+        <remap from="rpy_pose_wcs" to="odom_rpy" />
+    </node>
+
+</launch>
