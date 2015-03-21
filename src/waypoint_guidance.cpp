@@ -71,6 +71,7 @@ public: // methods
         min_acceptance_radius_(0.3), // Do not make this zero.
         minimum_stopping_speed_(.05), // Do not make this zero.
         stop_at_target_(false),
+        stopped_at_last_target_(true),
         distance_remaining_(0),
         desired_heading_(0),
         locked_desired_heading_(0),
@@ -82,6 +83,13 @@ public: // methods
         acceptance_radius_ = min_acceptance_radius_;
     }
     
+    // Reset any stateful information to default values that can't be done through setTarget.
+    void reset(void)
+    {
+        // Want this to be true so consistently stop and look at first waypoint.
+        stopped_at_last_target_ = true;
+    }
+
     // New target should be (x,y)
     void setTarget(double const * new_target, bool stop_at_target)
     {
@@ -93,7 +101,15 @@ public: // methods
         
         reset_heading_pid_integral();
         
-        updateState(facing_target);
+        if (!stopped_at_last_target_)
+        {
+            // Avoid suddenly stopping to face next target.
+            updateState(traveling_to_target);
+        }
+        else
+        {
+            updateState(facing_target);
+        }
     }
     
     // New radius will be capped if too small.
@@ -153,6 +169,9 @@ public: // methods
                 angular_velocity = 0;
             }
         }
+
+        // Save for next target.
+        stopped_at_last_target_ = stop_at_target_;
     
         return reached_target;
     }
@@ -326,6 +345,9 @@ private: // fields
     // If true then robot will stop at target.
     bool stop_at_target_;
     
+    // True if stopped at last target.
+    bool stopped_at_last_target_;
+
     // Crow-fly distance to reach target from last updated position.
     double distance_remaining_;
     
@@ -435,6 +457,9 @@ public: // methods
             zero_velocity_message.linear.x = 0;
             zero_velocity_message.angular.z = 0;
             velocity_publisher_.publish(zero_velocity_message);
+
+            // Reset any stateful information from guidance so can restart cleanly.
+            guidance_.reset();
         }
         else // reached target.
         {

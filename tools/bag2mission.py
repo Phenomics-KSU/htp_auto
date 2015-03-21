@@ -137,18 +137,31 @@ def splitAndMerge(points, epsilon):
     
     return result_list
 
-def convertPositionsToMissionItems(positions, radius):
+def convertPositionsToMissionItems(positions, radius, go):
     '''Returns list of waypoints corresponding to positions.
         Every waypoint is setup for the robot to stop there.'''
     type = 0
     frame = 0
     stop = 1.0 # True
     
+    if go:
+        print 'Continuing through waypoints.'
+    else:
+        print 'Stopping at each waypoint.'
+    
     mission_items = []
     for i, message in enumerate(positions):
         x = message[0]
         y = message[1]
         z = message[2]
+        
+        # If 'go' is true then only stop at first and last waypoints,
+        # otherwise stop at all of them.
+        first_or_last = (i == 0) or (i == len(positions)-1)
+        if go and not first_or_last:
+            stop = 0.0 # False
+        else:
+            stop = 1.0 # True
         
         mission_items.append([type, frame, x, y, z, radius, stop, 0, 0])
     
@@ -209,7 +222,7 @@ def writeMissionItemsToFile(mission_items, output_file_path):
 
     return
 
-def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius):
+def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius, go):
     '''Main function to simplify logged position data and write as waypoints to mission file.'''
     positions = extractPositionsFromBag(bag_path, position_topic)
     
@@ -223,7 +236,7 @@ def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, e
     
     print 'Simplified down to {0} positions.'.format(len(positions))
             
-    mission_items = convertPositionsToMissionItems(positions, radius)
+    mission_items = convertPositionsToMissionItems(positions, radius, go)
     
     if len(mission_items) == 0:
         print '\nError during conversion.'
@@ -252,8 +265,9 @@ if __name__ == '__main__':
     parser.add_argument('output_file', help='path to mission file to create')
     parser.add_argument('-p', dest='position_topic', default='/robot_pose_ekf/odom_combined', help='Name of topic to extract position from.')
     parser.add_argument('-t', dest='home_topic', default='/home', help='Name of topic to extract home position from.')
-    parser.add_argument('-e', dest='epsilon', default=.2, help='split threshold in meters. Smaller = more waypoints. Must be greater than 0')
+    parser.add_argument('-e', dest='epsilon', default=.2, help='Split threshold in meters. Smaller = more waypoints. Must be greater than 0')
     parser.add_argument('-a', dest='radius', default=.5, help='Acceptance radius of every waypoint.')
+    parser.add_argument('-g', dest='go', default='false', help='If \'true\' then will only stop at first and last waypoints')
     args = parser.parse_args()
     
     bag_path = args.bag_file
@@ -262,13 +276,14 @@ if __name__ == '__main__':
     home_topic = args.home_topic
     epsilon = float(args.epsilon)
     radius = float(args.radius)
+    go = args.go.lower() == 'true'; 
     
     if epsilon <= 0:
         print "\nError: epsilon must be greater than zero.\n"
         parser.print_help()
         sys.exit(1)
         
-    success = convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius)
+    success = convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius, go)
         
     if success: 
         print 'Success\n'
