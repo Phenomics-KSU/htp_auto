@@ -30,7 +30,7 @@ tab[9]="cp2gs"
 # IP of robot. Default to wireless.
 husky_ip="192.168.1.101" # wireless
 if [ "$1" = "wired" ]; then
-	husky_ip="192.168.1.11" # wired
+    husky_ip="192.168.1.11" # wired
 fi
 
 # Open new terminal to open tabs in.
@@ -98,8 +98,8 @@ do
 		    type_command "rqt"
         ;;
         rpy)
-            exec_command "export ROS_MASTER_URI=http://${husky_ip}:11311"
-		    type_command "rosrun htp_auto quat_to_euler pose_wcs:=robot_pose_ekf/odom_combined rpy_pose_wcs:=odom_euler"
+            exec_command "echo -e \"\nroslaunch htp_auto quat_2_rpy.launch --screen\n\""
+            type_command "ssh administrator@$husky_ip"
         ;;
         cp2h)
         	#inst0="To move entire workspace to husky:"
