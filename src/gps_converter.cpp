@@ -300,6 +300,7 @@ void dynamicReconfigureCallback(htp_auto::GPSConverterParamsConfig & config, uin
 bool resetHomeServiceCallback(std_srvs::Empty::Request & request, std_srvs::Empty::Response & response)
 {
     valid_home = false;
+    return true;
 }
 
 // Allows other tasks to convert Lat/Lon to local coordinates.  Returns false on failure.

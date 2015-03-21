@@ -12,6 +12,10 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <functional>
+#include <cctype>
+#include <locale>
 
 // ROS Library Headers
 #include <ros/ros.h>
@@ -49,6 +53,26 @@ public:
         : std::runtime_error("Failed string conversion on: " + failed_string)
         { }
 };
+
+// Trim whitespace from start
+static inline std::string &ltrim(std::string &s)
+{
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+    return s;
+}
+
+// Trim whitespace from end
+static inline std::string &rtrim(std::string &s)
+{
+    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+    return s;
+}
+
+// Trim whitespace from both ends
+static inline std::string &trim(std::string &s)
+{
+    return ltrim(rtrim(s));
+}
 
 // Converts input string to template type and returns results.
 // Throws BadConversion exception on failure.
@@ -120,6 +144,14 @@ bool loadFileCallback(LoadMissionFile::Request & request, LoadMissionFile::Respo
 
     while (std::getline(in_stream, line))
     {
+        line = trim(line);
+
+    	// Make sure it's not a blank line
+        if (line == "")
+        {
+            continue;
+        }
+
         if (!parseLine(line, command))
         {
             ROS_WARN_STREAM("Invalid command on line " << (num_items_loaded + 1));
