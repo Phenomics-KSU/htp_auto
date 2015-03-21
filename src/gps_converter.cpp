@@ -324,6 +324,8 @@ bool ConvertLLAToENUServiceCallback(htp_auto::ConvertLLA2ENU::Request & request,
     response.east = easting - utm_home[0];
     response.north = northing - utm_home[1];
     response.up = request.altitude - utm_home[2];
+
+    return true;
 }
 
 int main(int argc, char **argv)
