@@ -55,6 +55,7 @@ static double max_pdop = 0;
 static double min_sats = 0;
 static int8_t min_qual_ind = 0;
 static int8_t max_qual_ind = 0;
+static double distance_to_center_of_rotation;
 
 // Conversion constants
 const double rad2deg = 180.0 / M_PI;
@@ -155,8 +156,8 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     double lat_rad = last_fix.latitude * deg2rad;
     double lon_rad = last_fix.longitude * deg2rad;
     double lla[] = { lat_rad, lon_rad, last_fix.altitude };
-    double ecef[3];
-    lla_2_ecef(lla, ecef);
+    //double ecef[3];
+    //lla_2_ecef(lla, ecef);
 
     //ROS_INFO_STREAM_THROTTLE(5, "LLA:  " << lla[0] << ", " << lla[1] << ", " << lla[2]);
     //ROS_INFO_STREAM_THROTTLE(5, "ECEF: " << ecef[0] << ", " << ecef[1] << ", " << ecef[2]);
@@ -167,13 +168,13 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     }
 
     // Now convert from ECEF to NED using rotation matrix (Rne)
-    double ned[3];
-    rot_mult(Rne, ecef, ned, false);
+    //double ned[3];
+    //rot_mult(Rne, ecef, ned, false);
 
     //ROS_INFO_STREAM_THROTTLE(5, "NED:  " << ned[0] << ", " << ned[1] << ", " << ned[2]);
 
     // Finally convert from NED to ENU since that's the standard in ROS.
-    double enu[3] = { ned[1], ned[0], -ned[2] };
+    //double enu[3] = { ned[1], ned[0], -ned[2] };
 
     // Find ENU using UTM method since above method isn't working.
     double northing, easting;
@@ -181,6 +182,7 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     gps_common::LLtoUTM(last_fix.latitude, last_fix.longitude, northing, easting, zone);
 
     // Override ENU above with offset from home UTM
+    double enu[3];
     enu[0] = easting - utm_home[0];
     enu[1] = northing - utm_home[1];
     enu[2] = last_fix.altitude - utm_home[2];
@@ -192,6 +194,10 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     enu[1] += cos(corrected_yaw) * ant1_offset;  // northing
 
     //ROS_INFO_STREAM_THROTTLE(1, "ENU: " << enu[0] << ", " << enu[1] << ", " << enu[2]);
+
+    // Project measured position to be center of rotation.
+    enu[0] += cos(corrected_yaw) * distance_to_center_of_rotation;
+    enu[1] += sin(corrected_yaw) * distance_to_center_of_rotation;
 
     // TODO: handle this better or stop using UTM
     if (zone != utm_home_zone)
@@ -294,6 +300,7 @@ void dynamicReconfigureCallback(htp_auto::GPSConverterParamsConfig & config, uin
     min_sats = config.min_sats;
     min_qual_ind = config.min_qual_ind;
     max_qual_ind = config.max_qual_ind;
+    distance_to_center_of_rotation = config.dist_to_center_of_rotation;
 }
 
 // Invalidates home flag so next position fix will become new home position.
