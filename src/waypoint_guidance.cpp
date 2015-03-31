@@ -49,6 +49,15 @@
  */
 class WaypointGuidance2D
 {
+public: // types
+
+    typedef struct
+    {
+        double x; // local x position
+        double y; // local y position
+        bool stop; // if true will stop when reaching target
+    } target_t;
+
 private: // types
 
     // See class description for description of each state.
@@ -63,53 +72,44 @@ private: // types
 public: // methods
 
     // Constructor
-    WaypointGuidance2D(PID & heading_pid) :
+    WaypointGuidance2D(PID & heading_pid, PID & lateral_pid) :
         heading_pid_(heading_pid),
+        lateral_pid_(lateral_pid),
         heading_pid_last_time_(0),
+        lateral_pid_last_time_(0),
         travel_velocity_(.5),
         state_(waiting_for_target),
         min_acceptance_radius_(0.3), // Do not make this zero.
         minimum_stopping_speed_(.05), // Do not make this zero.
-        stop_at_target_(false),
-        stopped_at_last_target_(true),
+        target_(),
+        last_target_valid_(false),
+        last_target_(),
         distance_remaining_(0),
-        desired_heading_(0),
+        bearing_(0),
         locked_desired_heading_(0),
-        smallest_distance_remaining_(0)
+        smallest_distance_remaining_(0),
+        in_line_following_mode_(false),
+        control_projection_distance_(0)
     {
-        target_[0] = 0;
-        target_[1] = 0;
-  
-        acceptance_radius_ = min_acceptance_radius_;
+        setAcceptanceRadius(min_acceptance_radius_);
     }
     
     // Reset any stateful information to default values that can't be done through setTarget.
     void reset(void)
     {
-        // Want this to be true so consistently stop and look at first waypoint.
-        stopped_at_last_target_ = true;
+        last_target_valid_ = false;
     }
 
-    // New target should be (x,y)
-    void setTarget(double const * new_target, bool stop_at_target)
+    // Set new target.  Will move on from last target even if not reached.
+    void setTarget(target_t const & target)
     {
-        if (!new_target) { return; }
-        target_[0] = new_target[0];
-        target_[1] = new_target[1];
-        
-        stop_at_target_ = stop_at_target;
+        target_ = target;
         
         reset_heading_pid_integral();
-        
-        if (!stopped_at_last_target_)
-        {
-            // Avoid suddenly stopping to face next target.
-            updateState(traveling_to_target);
-        }
-        else
-        {
-            updateState(facing_target);
-        }
+        reset_lateral_pid_integral();
+
+        // Default state for new target.  Could be overwritten on first update.
+        updateState(facing_target);
     }
     
     // New radius will be capped if too small.
@@ -119,9 +119,12 @@ public: // methods
         acceptance_radius_ = new_radius;
     }
     
+    // Crowfly distance from last updated position and target waypoint.
     double getDistanceRemaining(void) const { return distance_remaining_; }
     
-    // Should be called when new position is measured. Position is (x,y) and positive heading is CCW.
+    // Should be called when new position is measured.
+    // Center Position is (x,y) and is center of rotation of vehicle.
+    // Positive heading is CCW measured off x axis.
     // Velocities are output parameters.  Returns true (only once) if target is reached.
     bool update(double const * position, double heading, double & linear_velocity, double & angular_velocity)
     {
@@ -133,17 +136,44 @@ public: // methods
         {
             return false; // Can't reach target since we don't have one.
         }
+
+        if (!last_target_valid_)
+        {
+            // Create a 'fake' last target using current position.
+            // Set 'stopped' to true so we will face first target below.
+            last_target_.x = position[0];
+            last_target_.y = position[1];
+            last_target_.stop = true;
+            last_target_valid_ = true;
+        }
+
+        if (!last_target_.stop)
+        {
+            // Don't want to stop so avoid suddenly stopping to face next target.
+            updateState(traveling_to_target);
+        }
      
         bool reached_target = false;
 
-        // Compute path to reach target from current position.
-        double path[2];
-        path[0] = target_[0] - position[0];
-        path[1] = target_[1] - position[1];
+        // Compute direct path to reach target from current position so we can find distance remaining and bearing.
+        double direct_path[2];
+        direct_path[0] = target_.x - position[0];
+        direct_path[1] = target_.y - position[1];
 
-        distance_remaining_ = sqrt(path[0]*path[0] + path[1]*path[1]);
+        distance_remaining_ = sqrt(direct_path[0]*direct_path[0] + direct_path[1]*direct_path[1]);
         
-        desired_heading_ = atan2(path[1], path[0]);
+        bearing_ = atan2(direct_path[1], direct_path[0]);
+
+        double control_position[2];
+        control_position[0] = position[0];
+        control_position[1] = position[1];
+
+        if (in_line_following_mode_)
+        {
+            // Project position out in front of robot to make dynamics easier to control.
+            control_position[0] += cos(heading) * control_projection_distance_;
+            control_position[1] += sin(heading) * control_projection_distance_;
+        }
 
         switch (state_)
         {
@@ -151,10 +181,10 @@ public: // methods
                 faceTarget(heading, angular_velocity);
                 break;
             case traveling_to_target:
-                reached_target = travel(heading, linear_velocity, angular_velocity);
+                reached_target = travel(control_position, heading, linear_velocity, angular_velocity);
                 break;
             case closing_in_on_target:
-                reached_target = travelInsideRadius(heading, linear_velocity, angular_velocity);
+                reached_target = travelInsideRadius(control_position, heading, linear_velocity, angular_velocity);
                 break;
         }
         
@@ -163,7 +193,7 @@ public: // methods
             updateState(waiting_for_target);
             
             // These should already be zero, but set them to make sure.
-            if (stop_at_target_)
+            if (target_.stop)
             {
                 linear_velocity = 0;
                 angular_velocity = 0;
@@ -171,7 +201,7 @@ public: // methods
         }
 
         // Save for next target.
-        stopped_at_last_target_ = stop_at_target_;
+        last_target_ = target_;
     
         return reached_target;
     }
@@ -180,14 +210,24 @@ public: // methods
     void dynamicConfigure(htp_auto::GuidanceParamsConfig & config, uint32_t level)
     {
         travel_velocity_ = config.travel_vel;
+        in_line_following_mode_ = config.line_following_mode;
+        control_projection_distance_ = config.projection_distance;
         heading_pid_.set_kp(config.heading_kp);
         heading_pid_.set_ki(config.heading_ki);
         heading_pid_.set_kd(config.heading_kd);
-        heading_pid_.set_saturation_high(config.heading_sat_high);
-        heading_pid_.set_saturation_low(config.heading_sat_low);
-        heading_pid_.set_integral_saturation_high(config.heading_int_sat_high);
-        heading_pid_.set_integral_saturation_low(config.heading_int_sat_low);
+        heading_pid_.set_saturation_high(+config.heading_sat);
+        heading_pid_.set_saturation_low(-config.heading_sat);
+        heading_pid_.set_integral_saturation_high(+config.heading_int_sat);
+        heading_pid_.set_integral_saturation_low(-config.heading_int_sat);
         heading_pid_.set_pub_rate_prescaler(config.heading_pub_prescaler);
+        lateral_pid_.set_kp(config.lateral_kp);
+        lateral_pid_.set_ki(config.lateral_ki);
+        lateral_pid_.set_kd(config.lateral_kd);
+        lateral_pid_.set_saturation_high(+config.lateral_sat);
+        lateral_pid_.set_saturation_low(-config.lateral_sat);
+        lateral_pid_.set_integral_saturation_high(+config.lateral_int_sat);
+        lateral_pid_.set_integral_saturation_low(-config.lateral_int_sat);
+        lateral_pid_.set_pub_rate_prescaler(config.lateral_pub_prescaler);
     }
 
 private: // methods
@@ -204,7 +244,7 @@ private: // methods
             case traveling_to_target:
                 break;
             case closing_in_on_target:
-                locked_desired_heading_ = desired_heading_;
+                locked_desired_heading_ = bearing_;
                 smallest_distance_remaining_ = distance_remaining_;
                 break;
         }
@@ -214,9 +254,9 @@ private: // methods
 
     void faceTarget(double heading, double & angular_velocity)
     {
-        double heading_error = desired_heading_ - heading;
+        double heading_error = bearing_ - heading;
         
-        angular_velocity = updateHeadingPID(desired_heading_, heading);
+        angular_velocity = updateHeadingPID(bearing_, heading);
         
         // Maximum threshold (+/-) for heading error in order to move forward.
         double heading_threshold = 4 * M_PI / 180.0;
@@ -228,17 +268,27 @@ private: // methods
     }
     
     // Returns true if reached target.
-    bool travel(double heading, double & linear_velocity, double & angular_velocity)
+    bool travel(double const * current_position, double heading, double & linear_velocity, double & angular_velocity)
     {
         bool reached_target = false;
     
-        angular_velocity = updateHeadingPID(desired_heading_, heading);
-        
+        if (!in_line_following_mode_)
+        {
+            // Simply try to face the next waypoint
+            angular_velocity = updateHeadingPID(bearing_, heading);
+        }
+        else // Want to stay on line between waypoints.
+        {
+            double lateral_error = calculateLateralError(current_position);
+
+            angular_velocity = updateLateralPID(lateral_error);
+        }
+
         linear_velocity = travel_velocity_;
 
         if (distance_remaining_ < acceptance_radius_)
         {
-            if (stop_at_target_)
+            if (target_.stop)
             {
                 // Need to slow down and get closer to target.
                 updateState(closing_in_on_target);
@@ -254,7 +304,7 @@ private: // methods
     }
     
     // Should only be called if want to stop at target.  Returns true if reached target.
-    bool travelInsideRadius(double heading, double & linear_velocity, double & angular_velocity)
+    bool travelInsideRadius(double const * current_position, double heading, double & linear_velocity, double & angular_velocity)
     {
         if (distance_remaining_ > smallest_distance_remaining_)
         {
@@ -277,12 +327,57 @@ private: // methods
             return true; // reached target.
         }
         
-        // Run heading controller with same desired heading as when we reached the acceptance radius.
-        angular_velocity = updateHeadingPID(locked_desired_heading_, heading);
+        if (!in_line_following_mode_)
+        {
+            // Run heading controller with same desired heading as when we reached the acceptance radius.
+            angular_velocity = updateHeadingPID(locked_desired_heading_, heading);
+        }
+        else // Want to stay on line between waypoints.
+        {
+            double lateral_error = calculateLateralError(current_position);
+
+            angular_velocity = updateLateralPID(lateral_error);
+        }
         
         return false; // because we still need to get closer to target.
     }
     
+    // Returns lateral error associated with current position.
+    double calculateLateralError(double const * current_position)
+    {
+        // Calculate vector from last waypoint to current waypoint.
+        double path[2];
+        path[0] = target_.x - last_target_.x;
+        path[1] = target_.y - last_target_.y;
+
+        double path_magnitude = sqrt(path[0]*path[0]+path[1]*path[1]);
+
+        // Calculate position vector relative to the last target.
+        double position[2];
+        position[0] = current_position[0] - last_target_.x;
+        position[1] = current_position[1] - last_target_.y;
+
+        // Project position vector onto path vector to find how long along current path we've travelled.
+        double path_travelled_magnitude = (position[0]*path[0] + position[1]*path[1]) / path_magnitude;
+
+        double path_travelled[2];
+        path_travelled[0] = path[0] * path_travelled_magnitude / path_magnitude;
+        path_travelled[1] = path[1] * path_travelled_magnitude / path_magnitude;
+
+        // The lateral error magnitude is the length of the vector between current position and
+        // the projected point along the path.
+        double lateral_error_magnitude = sqrt((position[0]-path_travelled[0]) * (position[0]-path_travelled[0])
+                                            + (position[1]-path_travelled[1]) * (position[1]-path_travelled[1]));
+
+        // Use cross product between path and position vector to find correct sign of lateral error.
+        double path_cross_position_z = path[0]*position[1] - path[1]*position[0];
+        float lateral_error_sign = path_cross_position_z < 0 ? -1.0 : 1.0;
+
+        double lateral_error = lateral_error_sign * lateral_error_magnitude;
+
+        return lateral_error;
+    }
+
     // Runs PID calculation.  Returns angular velocity command.
     double updateHeadingPID(double desired_heading, double actual_heading)
     {
@@ -312,15 +407,43 @@ private: // methods
         return angular_velocity;
     }
     
+    // Runs PID calculation.  Returns angular velocity command.
+    // Assumes desired lateral error is zero.
+    double updateLateralPID(double measured_lateral_error)
+    {
+        ros::Time current_time = ros::Time::now();
+
+        // Subtract times to get a duration and then convert to floating point representation.
+        double dt = (current_time - lateral_pid_last_time_).toSec();
+
+        if ((dt <= 0.0) || (dt > 1.0))
+        {
+            // Duration is unreasonable so don't run PID loop this call.
+            lateral_pid_last_time_ = current_time;
+            return 0;
+        }
+
+        double angular_velocity = lateral_pid_.calculate(0.0 - measured_lateral_error, dt);
+
+        lateral_pid_last_time_ = current_time;
+
+        return angular_velocity;
+    }
+
     void reset_heading_pid_integral(void) { heading_pid_.reset_integral_error(); }
-    
+    void reset_lateral_pid_integral(void) { lateral_pid_.reset_integral_error(); }
+
 private: // fields
 
     // Used to calculate angular velocity.
     PID & heading_pid_;
     
+    // Used to track line between waypoints when in 'line track' mode.
+    PID & lateral_pid_;
+
     // Last time that PID calculation was ran.
     ros::Time heading_pid_last_time_;
+    ros::Time lateral_pid_last_time_;
 
     // Commanded velocity when traveling to target.
     double travel_velocity_;
@@ -329,8 +452,12 @@ private: // fields
     state_t state_;
     
     // Where the robot is trying to get to.
-    double target_[2];
+    target_t target_;
     
+    // Last target the robot tried to reach.
+    bool last_target_valid_;
+    target_t last_target_;
+
     // Set smallest allowed radius to ensure heading controller doesn't get sketchy as we get really close to target.
     // **Do not make this zero.
     double min_acceptance_radius_;
@@ -342,23 +469,23 @@ private: // fields
     // How close robot must get to target before slowing down or considering it reached.
     double acceptance_radius_;
     
-    // If true then robot will stop at target.
-    bool stop_at_target_;
-    
-    // True if stopped at last target.
-    bool stopped_at_last_target_;
-
     // Crow-fly distance to reach target from last updated position.
     double distance_remaining_;
     
-    // Where the robot needs to be facing.  Positive CCW.
-    double desired_heading_;
-    
+    // Heading angle to next waypoint.  Positive CCW.
+    double bearing_;
+
     // Desired heading when acceptance radius is first reached.  Keeps heading controller from overreacting.
     double locked_desired_heading_;
     
     // The closest the robot has gotten to the target when trying to approach it inside the acceptance radius.
     double smallest_distance_remaining_;
+
+    // True if currently trying to stay on line between waypoints instead of just facing next waypoint.
+    bool in_line_following_mode_;
+
+    // How far (meters) to control out in front of Center of Rotation position when line following.
+    double control_projection_distance_;
 
 };
 
@@ -426,8 +553,11 @@ public: // methods
     void executeGoalCallback(const htp_auto::WaypointGuidanceGoalConstPtr & goal)
     {
         // TODO validate and do something with goal frame
-        double target[2] = { goal->target_x, goal->target_y };
-        guidance_.setTarget(target, goal->stop_at_target);
+        WaypointGuidance2D::target_t new_target;
+        new_target.x = goal->target_x;
+        new_target.y = goal->target_y;
+        new_target.stop = goal->stop_at_target;
+        guidance_.setTarget(new_target);
         guidance_.setAcceptanceRadius(goal->acceptance_radius);
 
         // This call generates an error of "Cannot accept next goal when new goal is not available".
@@ -525,11 +655,13 @@ int main(int argc, char **argv)
 
     // Define publisher to output PID state data for tuning.
     ros::Publisher heading_pid_pub = nh.advertise<htp_auto::PIDState>("heading_pid_state", 30);
+    ros::Publisher lateral_pid_pub = nh.advertise<htp_auto::PIDState>("lateral_pid_state", 30);
 
     // Default params to zero because they will get set in reconfigure callback.
     PID heading_pid(0, 0, 0, 0, 0, 0, 0, &heading_pid_pub, -1);
+    PID lateral_pid(0, 0, 0, 0, 0, 0, 0, &lateral_pid_pub, -1);
 
-    WaypointGuidance2D waypoint_guidance(heading_pid);
+    WaypointGuidance2D waypoint_guidance(heading_pid, lateral_pid);
 
     // Setup reconfigure server to allow for parameter updates.
     dynamic_reconfigure::Server<htp_auto::GuidanceParamsConfig> config_server;
@@ -538,7 +670,7 @@ int main(int argc, char **argv)
     // Setting this callback will initially call it will all the default values.
     config_callback = boost::bind(&WaypointGuidance2D::dynamicConfigure, &waypoint_guidance, _1, _2);
     config_server.setCallback(config_callback);
-    
+
     // Create action server to provide ROS interface with guidance logic.
     WaypointGuidanceAction guidance_action_server(nh, ros::this_node::getName(), waypoint_guidance);
     
