@@ -16,8 +16,9 @@
 #include <dynamic_reconfigure/server.h>
 
 // ROS Topic Headers
-#include <sensor_msgs/NavSatFix.h>
+//#include <sensor_msgs/NavSatFix.h>
 #include <nmea_navsat_driver/AVR.h>
+#include <nmea_navsat_driver/GGK.h>
 #include <nav_msgs/Odometry.h>
 #include <std_srvs/Empty.h>
 #include <tf/transform_datatypes.h>
@@ -33,7 +34,8 @@
 // Global so callbacks can use them. Only one thread so don't need to worry about locking.
 static ros::Publisher odom_pub;
 static ros::Publisher home_pub;
-static sensor_msgs::NavSatFix last_fix;
+//static sensor_msgs::NavSatFix last_fix;
+static nmea_navsat_driver::GGK last_fix;
 
 // **NOTE** right now home is position of primary antenna
 
@@ -53,8 +55,11 @@ static std::string utm_home_zone;
 static double yaw_offset = 0;
 static double max_pdop = 0;
 static double min_sats = 0;
-static int8_t min_qual_ind = 0;
-static int8_t max_qual_ind = 0;
+static int8_t yaw_min_qual_ind = 0;
+static int8_t yaw_max_qual_ind = 0;
+static int8_t pos_qual_ind_1 = 0;
+static int8_t pos_qual_ind_2 = 0;
+static int8_t pos_qual_ind_3 = 0;
 static double distance_to_center_of_rotation;
 
 // Conversion constants
@@ -92,7 +97,7 @@ void setHomePosition(const double * lla, const std::string & source)
 }
 
 // Saves received message and lets AVR callback do all the checking and conversions.
-void NavSatFixMessageReceived(const sensor_msgs::NavSatFix & message)
+void GGKMessageReceived(const nmea_navsat_driver::GGK & message)
 {
     last_fix = message;
 }
@@ -115,25 +120,45 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     last_used_fix_time = last_fix.header.stamp;
 
     // If don't have good enough fix then don't want to publish odom message.
-    // For quality indicator:
-    // 0: Fix not available or invalid
-    // 1: Autonomous GPS fix
-    // 2: Differential carrier phase solution RTK (Float)
-    // 3: Differential carrier phase solution RTK (Fix)
-    // 4: Differential code-based solution, DGPS
+    // For yaw quality indicator:
+    //  0: Fix not available or invalid
+    //  1: Autonomous GPS fix
+    //  2: Differential carrier phase solution RTK (Float)
+    //  3: Differential carrier phase solution RTK (Fix)
+    //  4: Differential code-based solution, DGPS
+    // For position quality indicator:
+    //  0:  Fix not available or invalid
+    //  1:  Autonomous GPS fix
+    //  2:  RTK float solution
+    //  3:  RTK fix solution
+    //  4:  Differential, code phase only solution (DGPS)
+    //  5:  SBAS solution – WAAS/EGNOS/MSAS
+    //  6:  RTK float or RTK location 3D Network solution
+    //  7:  RTK fixed 3D Network solution
+    //  8:  RTK float or RTK location 2D in a Network solution
+    //  9:  RTK fixed 2D Network solution
+    //  10: OmniSTAR HP/XP solution
+    //  11: OmniSTAR VBS solution
+    //  12: Location RTK solution
+    //  13: Beacon DGPS
     bool pdop_ok = message.pdop <= max_pdop;
     bool num_sats_ok = message.sats_used >= min_sats;
-    bool quality_ok = (message.gps_quality >= min_qual_ind) && (message.gps_quality <= max_qual_ind);
+    bool yaw_quality_ok = (message.gps_quality >= yaw_min_qual_ind) &&
+                          (message.gps_quality <= yaw_max_qual_ind);
+    bool position_quality_ok = (last_fix.gps_quality == pos_qual_ind_1) ||
+                               (last_fix.gps_quality == pos_qual_ind_2) ||
+                               (last_fix.gps_quality == pos_qual_ind_3);
 
-    if (!pdop_ok || !num_sats_ok || !quality_ok)
+    if (!pdop_ok || !num_sats_ok || !yaw_quality_ok || !position_quality_ok)
     {
         // Copy into standard types to display properly.
         double pdop = message.pdop;
         int sats_used = message.sats_used;
-        int gps_quality = message.gps_quality;
+        int yaw_gps_quality = message.gps_quality;
+        int position_gps_quality = last_fix.gps_quality;
         ROS_WARN_STREAM_THROTTLE(2, "GPS Checks Failed");
-        ROS_WARN_STREAM_THROTTLE(2, "PDOP: " << pdop << " SATS: " << sats_used << " QUAL: " << gps_quality);
-        ROS_WARN_STREAM_THROTTLE(2, "Status: " << pdop_ok << num_sats_ok << quality_ok);
+        ROS_WARN_STREAM_THROTTLE(2, "PDOP: " << pdop << " SATS: " << sats_used << " YAW_QUAL: " << yaw_gps_quality << " POS_QUAL: " << position_gps_quality);
+        ROS_WARN_STREAM_THROTTLE(2, "Status: " << pdop_ok << num_sats_ok << yaw_quality_ok << position_quality_ok);
         return;
     }
 
@@ -298,8 +323,11 @@ void dynamicReconfigureCallback(htp_auto::GPSConverterParamsConfig & config, uin
     yaw_offset = config.yaw_offset * deg2rad;
     max_pdop = config.max_pdop;
     min_sats = config.min_sats;
-    min_qual_ind = config.min_qual_ind;
-    max_qual_ind = config.max_qual_ind;
+    yaw_min_qual_ind = config.yaw_min_qual_ind;
+    yaw_max_qual_ind = config.yaw_max_qual_ind;
+    pos_qual_ind_1 = config.pos_qual_ind_1;
+    pos_qual_ind_2 = config.pos_qual_ind_2;
+    pos_qual_ind_3 = config.pos_qual_ind_3;
     distance_to_center_of_rotation = config.dist_to_center_of_rotation;
 }
 
@@ -344,7 +372,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
     ros::Subscriber avr_sub = nh.subscribe("avr", 1, AVRMessageReceived);
-    ros::Subscriber nav_fix_sub = nh.subscribe("fix", 1, NavSatFixMessageReceived);
+    ros::Subscriber ggk_sub = nh.subscribe("ggk", 1, GGKMessageReceived);
 
     // Home publisher needs to be latched so log file can store it.
     odom_pub = nh.advertise<nav_msgs::Odometry>("gps", 5);
