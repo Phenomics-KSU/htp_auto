@@ -103,6 +103,12 @@ public: // methods
     // Set new target.  Will move on from last target even if not reached.
     void setTarget(target_t const & target)
     {
+        if (last_target_valid_)
+        {
+            // Save current target before over writing it.
+            last_target_ = target_;
+        }
+
         target_ = target;
         
         reset_heading_pid_integral();
@@ -188,6 +194,8 @@ public: // methods
                 break;
         }
         
+        //ROS_INFO_THROTTLE(1, "State: %d, vel: %.4lf", state_, linear_velocity);
+
         if (reached_target)
         {
             updateState(waiting_for_target);
@@ -199,9 +207,6 @@ public: // methods
                 angular_velocity = 0;
             }
         }
-
-        // Save for next target.
-        last_target_ = target_;
     
         return reached_target;
     }
@@ -281,6 +286,8 @@ private: // methods
         {
             double lateral_error = calculateLateralError(current_position);
 
+            //ROS_INFO_THROTTLE(1, "Lateral error: %.4lf", lateral_error);
+
             angular_velocity = updateLateralPID(lateral_error);
         }
 
@@ -352,6 +359,13 @@ private: // methods
 
         double path_magnitude = sqrt(path[0]*path[0]+path[1]*path[1]);
 
+        if (path_magnitude == 0.0)
+        {
+            // Avoid division by zero below.
+            ROS_WARN_THROTTLE(1, "Path magnitude zero. Returning zero lateral error.");
+            return 0.0;
+        }
+
         // Calculate position vector relative to the last target.
         double position[2];
         position[0] = current_position[0] - last_target_.x;
@@ -371,7 +385,7 @@ private: // methods
 
         // Use cross product between path and position vector to find correct sign of lateral error.
         double path_cross_position_z = path[0]*position[1] - path[1]*position[0];
-        float lateral_error_sign = path_cross_position_z < 0 ? -1.0 : 1.0;
+        double lateral_error_sign = path_cross_position_z < 0 ? -1.0 : 1.0;
 
         double lateral_error = lateral_error_sign * lateral_error_magnitude;
 
@@ -546,7 +560,7 @@ public: // methods
             velocity_publisher_.publish(velocity_message);
 
             // Temporary. Just for debugging.
-            //ROS_INFO_THROTTLE(2, "Guide: (%.3lf, %.3lf, %.1lf)", position[0], position[1], heading * 180 / M_PI);
+            //ROS_INFO_THROTTLE(1, "Guide: (%.3lf, %.3lf, %.1lf, %.1lf)", position[0], position[1], heading * 180 / M_PI, linear_velocity);
         }
     }
 
