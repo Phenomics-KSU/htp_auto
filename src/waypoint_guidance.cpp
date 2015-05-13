@@ -268,7 +268,10 @@ private: // methods
         
         if (fabs(heading_error) <= heading_threshold)
         {
-            updateState(traveling_to_target);        
+            updateState(traveling_to_target);
+
+            // Reset integral on lateral PID so it doesn't build up when we're just turning.
+            reset_lateral_pid_integral();
         }
     }
     
@@ -400,10 +403,11 @@ private: // methods
         // Subtract times to get a duration and then convert to floating point representation.
         double dt = (current_time - heading_pid_last_time_).toSec();
         
-        if ((dt <= 0.0) || (dt > 1.0))
+        if ((dt <= 0.0) || (dt > 0.5))
         {
             // Duration is unreasonable so don't run PID loop this call.
             heading_pid_last_time_ = current_time;   
+            reset_heading_pid_integral();
             return 0;
         }
 
@@ -430,10 +434,11 @@ private: // methods
         // Subtract times to get a duration and then convert to floating point representation.
         double dt = (current_time - lateral_pid_last_time_).toSec();
 
-        if ((dt <= 0.0) || (dt > 1.0))
+        if ((dt <= 0.0) || (dt > 0.5))
         {
             // Duration is unreasonable so don't run PID loop this call.
             lateral_pid_last_time_ = current_time;
+            reset_lateral_pid_integral();
             return 0;
         }
 
