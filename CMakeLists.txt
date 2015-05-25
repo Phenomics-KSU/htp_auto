@@ -7,10 +7,12 @@ project(htp_auto)
 find_package(catkin REQUIRED 
   COMPONENTS
   roscpp
+  rospy
   actionlib
   message_generation
   std_msgs
   actionlib_msgs
+  nav_msgs
   tf
   dynamic_reconfigure
 )
@@ -48,6 +50,7 @@ add_message_files(
   FILES
   Command.msg
   Home.msg
+  OdometryUTC.msg
   PIDState.msg
 )
 
@@ -73,6 +76,7 @@ generate_messages(
   DEPENDENCIES
   actionlib_msgs
   std_msgs
+  nav_msgs
 )
 
 generate_dynamic_reconfigure_options(
@@ -156,10 +160,10 @@ target_link_libraries(gps_converter
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+install(PROGRAMS
+   src/sensor_control_client.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS htp_auto htp_auto_node

@@ -20,6 +20,7 @@
 #include <nmea_navsat_driver/AVR.h>
 #include <nmea_navsat_driver/GGK.h>
 #include <nav_msgs/Odometry.h>
+#include <htp_auto/OdometryUTC.h>
 #include <std_srvs/Empty.h>
 #include <tf/transform_datatypes.h>
 #include <htp_auto/SetHome.h>
@@ -33,6 +34,7 @@
 
 // Global so callbacks can use them. Only one thread so don't need to worry about locking.
 static ros::Publisher odom_pub;
+static ros::Publisher odom_utc_pub;
 static ros::Publisher home_pub;
 //static sensor_msgs::NavSatFix last_fix;
 static nmea_navsat_driver::GGK last_fix;
@@ -303,6 +305,13 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 
     odom_pub.publish(odom);
 
+    // Add in UTC time and publish secondary message.
+    htp_auto::OdometryUTC odom_utc;
+    odom_utc.odom = odom;
+    odom_utc.time = message.utc_time;
+
+    odom_utc_pub.publish(odom_utc);
+
 }
 
 // Sets new home position to the LLA specified in request.
@@ -376,6 +385,7 @@ int main(int argc, char **argv)
 
     // Home publisher needs to be latched so log file can store it.
     odom_pub = nh.advertise<nav_msgs::Odometry>("gps", 5);
+    odom_utc_pub = nh.advertise<htp_auto::OdometryUTC>("gps_utc", 5);
     home_pub = nh.advertise<htp_auto::Home>("home", 1, /*latched*/true);
 
     // Setup reconfigure server to allow for parameter updates.

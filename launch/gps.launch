@@ -3,6 +3,7 @@
     <arg name="port" default="/dev/ttyS0"/>
     <arg name="baud" default="38400"/>
     <arg name="test_file" default=""/>
+    <arg name="sensor_hosts" default="default"/>
 
     <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver">
         <param name="port" value="$(arg port)"/>
@@ -11,5 +12,9 @@
     </node>
 
     <node pkg="htp_auto" type="gps_converter" name="gps_converter"> </node>
+    
+    <node pkg="htp_auto" type="sensor_control_client.py" name="sensor_control_client">
+        <param name="sensor_hosts" value="$(arg sensor_hosts)"/>
+    </node>
 
 </launch>
