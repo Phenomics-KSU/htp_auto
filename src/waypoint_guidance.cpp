@@ -9,6 +9,7 @@
 // Standard Headers
 #include <iomanip>
 #include <math.h>
+#include <algorithm>
 
 // ROS Library Headers
 #include <ros/ros.h>
@@ -80,17 +81,30 @@ public: // methods
         travel_velocity_(.5),
         state_(waiting_for_target),
         min_acceptance_radius_(0.3), // Do not make this zero.
-        minimum_stopping_speed_(.05), // Do not make this zero.
+        minimum_stopping_speed_(.1), // Do not make this zero.
         target_(),
+        current_heading_(0),
         last_target_valid_(false),
         last_target_(),
         distance_remaining_(0),
         bearing_(0),
         locked_desired_heading_(0),
-        smallest_distance_remaining_(0),
         in_line_following_mode_(false),
-        control_projection_distance_(0)
+        control_projection_distance_(0),
+        last_face_target_error_(0),
+        last_face_target_error_valid_(false),
+        last_turning_check_time_(0),
+        last_turning_check_heading_(0),
+        stopped_turning_(false),
+        last_driving_check_time_(0),
+        stopped_driving_(false)
     {
+        for (int i = 0; i < 2; ++i)
+        {
+            last_driving_check_position_[i] = 0;
+            position_when_entering_radius_[i] = 0;
+            current_position_[i] = 0;
+        }
         setAcceptanceRadius(min_acceptance_radius_);
     }
     
@@ -107,12 +121,16 @@ public: // methods
         {
             // Save current target before over writing it.
             last_target_ = target_;
+
+            if (last_target_.stop)
+            {
+                // We've been stopped so keep integrals from building up.
+                reset_heading_pid_integral();
+                reset_lateral_pid_integral();
+            }
         }
 
         target_ = target;
-        
-        reset_heading_pid_integral();
-        reset_lateral_pid_integral();
 
         // Default state for new target.  Could be overwritten on first update.
         updateState(facing_target);
@@ -142,6 +160,11 @@ public: // methods
         {
             return false; // Can't reach target since we don't have one.
         }
+
+        // Update class members so they can be used when changing states.
+        current_heading_ = heading;
+        current_position_[0] = position[0];
+        current_position_[1] = position[1];
 
         if (!last_target_valid_)
         {
@@ -181,16 +204,20 @@ public: // methods
             control_position[1] += sin(heading) * control_projection_distance_;
         }
 
+        updateStoppedTurningCheck(heading);
+        updateStoppedDrivingCheck(control_position);
+
         switch (state_)
         {
             case facing_target:
-                faceTarget(heading, angular_velocity);
+                faceTarget(control_position, heading, angular_velocity);
+                linear_velocity = 0;
                 break;
             case traveling_to_target:
                 reached_target = travel(control_position, heading, linear_velocity, angular_velocity);
                 break;
             case closing_in_on_target:
-                reached_target = travelInsideRadius(control_position, heading, linear_velocity, angular_velocity);
+                reached_target = travelInsideRadius(position, control_position, heading, linear_velocity, angular_velocity);
                 break;
         }
         
@@ -245,36 +272,62 @@ private: // methods
             case waiting_for_target:
                 break;
             case facing_target:
+                last_face_target_error_valid_ = false;
                 break;
             case traveling_to_target:
                 break;
             case closing_in_on_target:
                 locked_desired_heading_ = bearing_;
-                smallest_distance_remaining_ = distance_remaining_;
+                position_when_entering_radius_[0] = current_position_[0];
+                position_when_entering_radius_[1] = current_position_[1];
                 break;
+        }
+
+        if (new_state != waiting_for_target)
+        {
+            // give vehicle chance to start moving before saying it's not.
+            resetMovementChecks();
         }
     
         state_ = new_state;
     }
 
-    void faceTarget(double heading, double & angular_velocity)
+    void faceTarget(double const * current_position, double heading, double & angular_velocity)
     {
         double heading_error = bearing_ - heading;
-        
-        angular_velocity = updateHeadingPID(bearing_, heading);
-        
-        // Maximum threshold (+/-) for heading error in order to move forward.
-        double heading_threshold = 4 * M_PI / 180.0;
-        
-        if (fabs(heading_error) <= heading_threshold)
-        {
-            updateState(traveling_to_target);
 
-            // Reset integral on lateral PID so it doesn't build up when we're just turning.
-            reset_lateral_pid_integral();
+        // Current error.  Value is set depending on mode (heading or lateral)
+        double error = 0;
+
+        if (!in_line_following_mode_)
+        {
+            angular_velocity = updateHeadingPID(bearing_, heading);
+        
+            error = heading_error; // set for checks below.
         }
+        else // in line following mode
+        {
+            double lateral_error = calculateLateralError(current_position);
+            angular_velocity = updateLateralPID(lateral_error);
+
+            error = lateral_error; // set for checks below.
+        }
+
+        // Need to make sure not turned around before doing checks or could move on too early.
+        bool kinda_looking_at_wp = fabs(heading_error) < (15 * M_PI / 180.0);
+        if (last_face_target_error_valid_ && kinda_looking_at_wp)
+        {
+            if (signDifference(error, last_face_target_error_) || stopped_turning_)
+            {
+                // Either swept over goal or timed out trying to reach it so time to start traveling.
+                updateState(traveling_to_target);
+            }
+        }
+
+        last_face_target_error_ = error;
+        last_face_target_error_valid_ = true;
     }
-    
+
     // Returns true if reached target.
     bool travel(double const * current_position, double heading, double & linear_velocity, double & angular_velocity)
     {
@@ -314,29 +367,33 @@ private: // methods
     }
     
     // Should only be called if want to stop at target.  Returns true if reached target.
-    bool travelInsideRadius(double const * current_position, double heading, double & linear_velocity, double & angular_velocity)
+    bool travelInsideRadius(double const * current_position, double const * control_position, double heading, double & linear_velocity, double & angular_velocity)
     {
-        if (distance_remaining_ > smallest_distance_remaining_)
+        // Desired vector between where we entered the circle and the circle center.
+        double desired_vector[2];
+        desired_vector[0] = target_.x - position_when_entering_radius_[0];
+        desired_vector[1] = target_.y - position_when_entering_radius_[1];
+
+        // Travel vector is between where we entered the circle and the current position.
+        double travel_vector[2];
+        travel_vector[0] = current_position[0] - position_when_entering_radius_[0];
+        travel_vector[1] = current_position[1] - position_when_entering_radius_[1];
+
+        // See if we've traveled past the desired vector or have come to a stop.
+        double ratio = projectionRatio(travel_vector, desired_vector);
+        if ((ratio > 1.0) || stopped_driving_)
         {
-            // Getting farther away from target so consider it reached.
             linear_velocity = 0;
             angular_velocity = 0;
             return true; // reached target.
         }
-
-        smallest_distance_remaining_ = distance_remaining_;
         
         // Decrease linear velocity as position error gets smaller to make a smooth stop.  
         linear_velocity = travel_velocity_ * (distance_remaining_ / acceptance_radius_);
         
-        if (fabs(linear_velocity) < minimum_stopping_speed_)
-        {
-            // Slowed down enough to consider we're at center of waypoint.
-            linear_velocity = 0;
-            angular_velocity = 0;
-            return true; // reached target.
-        }
-        
+        // Keep linear velocity from getting so small the robot comes to a complete stop short of target.
+        linear_velocity = std::max(linear_velocity, minimum_stopping_speed_);
+
         if (!in_line_following_mode_)
         {
             // Run heading controller with same desired heading as when we reached the acceptance radius.
@@ -344,14 +401,14 @@ private: // methods
         }
         else // Want to stay on line between waypoints.
         {
-            double lateral_error = calculateLateralError(current_position);
+            double lateral_error = calculateLateralError(control_position);
 
             angular_velocity = updateLateralPID(lateral_error);
         }
         
         return false; // because we still need to get closer to target.
     }
-    
+
     // Returns lateral error associated with current position.
     double calculateLateralError(double const * current_position)
     {
@@ -393,6 +450,24 @@ private: // methods
         double lateral_error = lateral_error_sign * lateral_error_magnitude;
 
         return lateral_error;
+    }
+
+    // Project vector a onto b and then return the ratio of the projection to the length of b.
+    double projectionRatio(double const * a, double const * b)
+    {
+         double b_magnitude = sqrt(b[0]*b[0] + b[1]*b[1]);
+
+         if (b_magnitude == 0.0)
+         {
+             // Avoid division by zero below.
+             ROS_WARN_THROTTLE(1, "Base vector has zero magnitude. Returning zero ratio.");
+             return 0.0;
+         }
+
+         // Project a onto b.
+         double projection_magnitude = (a[0]*b[0] + a[1]*b[1]) / b_magnitude;
+
+         return projection_magnitude / b_magnitude;
     }
 
     // Runs PID calculation.  Returns angular velocity command.
@@ -449,6 +524,65 @@ private: // methods
         return angular_velocity;
     }
 
+    // Update stopped turning flag if enough movement was detected over the previous 1 second interval.
+    void updateStoppedTurningCheck(double heading)
+    {
+        double current_time = ros::Time::now().toSec();
+        double time_since_last_check = current_time - last_turning_check_time_;
+        if (time_since_last_check > 1.0)
+        {
+            const double change_thresh = 3 * M_PI / 180.0; // radians
+
+            double heading_change = heading - last_turning_check_heading_;
+
+            stopped_turning_ = fabs(heading_change) < change_thresh;
+
+            last_turning_check_time_ = current_time;
+            last_turning_check_heading_ = heading;
+        }
+    }
+
+    // Update stopped driving flag if enough movement was detected over the previous 1 second interval.
+    void updateStoppedDrivingCheck(const double * position)
+    {
+        double current_time = ros::Time::now().toSec();
+        double time_since_last_check = current_time - last_driving_check_time_;
+        if (time_since_last_check > 1.0)
+        {
+            const double change_thresh = 0.04; // meters
+
+            double x_change = position[0] - last_driving_check_position_[0];
+            double y_change = position[1] - last_driving_check_position_[1];
+
+            double distance_change = sqrt(x_change*x_change + y_change*y_change);
+
+            stopped_driving_ = distance_change < change_thresh;
+
+            last_driving_check_time_ = current_time;
+            last_driving_check_position_[0] = position[0];
+            last_driving_check_position_[1] = position[1];
+        }
+    }
+
+    // Set stopped checks to false and reset check duration.
+    void resetMovementChecks(void)
+    {
+        stopped_turning_ = false;
+        stopped_driving_ = false;
+        double current_time = ros::Time::now().toSec();
+        last_turning_check_time_ = current_time;
+        last_driving_check_time_ = current_time;
+        last_turning_check_heading_ = current_heading_;
+        last_driving_check_position_[0] = current_position_[0];
+        last_driving_check_position_[1] = current_position_[1];
+    }
+
+    // Return true if input parameters have different signs.
+    bool signDifference(double one, double two)
+    {
+        return ((one*two) < 0 ? true : false);
+    }
+
     void reset_heading_pid_integral(void) { heading_pid_.reset_integral_error(); }
     void reset_lateral_pid_integral(void) { lateral_pid_.reset_integral_error(); }
 
@@ -473,6 +607,10 @@ private: // fields
     // Where the robot is trying to get to.
     target_t target_;
     
+    // Current pose members used when changing state.  Prefer passing local references than using these.
+    double current_position_[2];
+    double current_heading_;
+
     // Last target the robot tried to reach.
     bool last_target_valid_;
     target_t last_target_;
@@ -481,7 +619,7 @@ private: // fields
     // **Do not make this zero.
     double min_acceptance_radius_;
     
-    // How slow robot has to travel when approaching target center to be considered at waypoint.
+    // Minimum speed when approaching waypoint to stop.
     // **Recommended to not make this zero.
     double minimum_stopping_speed_;
     
@@ -497,14 +635,38 @@ private: // fields
     // Desired heading when acceptance radius is first reached.  Keeps heading controller from overreacting.
     double locked_desired_heading_;
     
-    // The closest the robot has gotten to the target when trying to approach it inside the acceptance radius.
-    double smallest_distance_remaining_;
+    // The position right when the robot enters the radius to slow down.
+    double position_when_entering_radius_[2];
 
     // True if currently trying to stay on line between waypoints instead of just facing next waypoint.
     bool in_line_following_mode_;
 
     // How far (meters) to control out in front of Center of Rotation position when line following.
     double control_projection_distance_;
+
+    // Calculated error last time face target is called. Depends on mode (heading/lateral) to what it represents.
+    double last_face_target_error_;
+
+    // True if 'last face target error' is valid.
+    bool last_face_target_error_valid_;
+
+    // Time stamp when last check was performed to update turning status.
+    double last_turning_check_time_;
+
+    // Heading when last check was performed to update turning status.
+    double last_turning_check_heading_;
+
+    // Becomes true if vehicle stops turning after being in a state for a couple seconds.
+    double stopped_turning_;
+
+    // Time stamp when last check was performed to update driving status.
+    double last_driving_check_time_;
+
+    // Position when last check was performed to update driving status.
+    double last_driving_check_position_[2];
+
+    // Becomes true if vehicle stops physical moving forward after being in a state for a couple seconds.
+    double stopped_driving_;
 
 };
 
