@@ -132,6 +132,7 @@ bool PID::needToPublish(void)
  */
 void PID::publish(double error, double derivative_error, double delta_time, double result)
 {
+    publish_data_.header.stamp = ros::Time::now();
     publish_data_.error = error;
     publish_data_.error_sum = error_sum_;
     publish_data_.derivative_error = derivative_error;
