@@ -132,8 +132,16 @@ public: // methods
 
         target_ = target;
 
-        // Default state for new target.  Could be overwritten on first update.
-        updateState(facing_target);
+        if (last_target_valid_ && !last_target_.stop)
+        {
+            // Don't want to stop so avoid suddenly stopping to face next target.
+            updateState(traveling_to_target);
+        }
+        else
+        {
+            // We're already stopped so face next target.
+            updateState(facing_target);
+        }
     }
     
     // New radius will be capped if too small.
@@ -170,16 +178,11 @@ public: // methods
         {
             // Create a 'fake' last target using current position.
             // Set 'stopped' to true so we will face first target below.
+            // This needs to be here instead of set target so we can use current position.
             last_target_.x = position[0];
             last_target_.y = position[1];
             last_target_.stop = true;
             last_target_valid_ = true;
-        }
-
-        if (!last_target_.stop)
-        {
-            // Don't want to stop so avoid suddenly stopping to face next target.
-            updateState(traveling_to_target);
         }
      
         bool reached_target = false;
