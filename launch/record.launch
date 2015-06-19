@@ -1,0 +1,11 @@
+<launch>
+
+    <node pkg="rosbag" type="record" name="bag_record"
+           args="record --split --size 2000 -o output
+            /avr
+            /ggk
+            /gps_utc
+            /husky/data/system_status
+            /rosout
+            "/>
+</launch>

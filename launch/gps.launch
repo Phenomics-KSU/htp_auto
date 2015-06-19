@@ -3,7 +3,9 @@
     <arg name="port" default="/dev/ttyS0"/>
     <arg name="baud" default="38400"/>
     <arg name="test_file" default=""/>
-    <arg name="sensor_hosts" default="default"/>
+    <arg name="sensor_hosts" default="none"/>
+    
+    <include file="$(find htp_auto)/launch/record.launch" />
 
     <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver">
         <param name="port" value="$(arg port)"/>
