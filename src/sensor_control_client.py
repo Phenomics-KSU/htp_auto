@@ -92,8 +92,8 @@ if __name__ == '__main__':
     default_server_port = 5000
     default_host = '{0} {1}'.format(default_server_host, default_server_port)
 
-    # Determine if host is file path or a list.
-    hosts = rospy.get_param('~sensor_hosts', default_host)
+    # Determine if host is file path or a list. 
+    hosts = rospy.get_param('~sensor_hosts', "none")
     if os.path.exists(hosts):
         # Replace hosts variable with file contents to mimic passing in on command line.
         with open(hosts) as hosts_file:
@@ -130,6 +130,10 @@ if __name__ == '__main__':
             rospy.logerr('Error connecting to server: {0}'.format(e))
         clients.append(client)
         
-    rospy.Subscriber("gps_utc", OdometryUTC, odom_callback)
+    if clients is None:
+        rospy.logwarn('No clients to connect to.  Exiting sensor control client.')
+        sys.exit(0)
+        
+    rospy.Subscriber("gps_utc", OdometryUTC, odom_callback, queue_size = 50)
     
     rospy.spin()                               
