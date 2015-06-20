@@ -305,10 +305,14 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
 
     odom_pub.publish(odom);
 
-    // Add in UTC time and publish secondary message.
+    // Add in UTC time and UTM coordinates.
     htp_auto::OdometryUTC odom_utc;
     odom_utc.odom = odom;
     odom_utc.time = message.utc_time;
+    odom_utc.easting = easting;
+    odom_utc.northing = northing;
+    odom_utc.altitude = last_fix.altitude;
+    odom_utc.utm_zone = zone;
 
     odom_utc_pub.publish(odom_utc);
 

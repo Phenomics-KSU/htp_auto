@@ -12,18 +12,24 @@ from htp_auto.msg import OdometryUTC
 def odom_callback(odom):
     '''Subscriber callback for odometery message. Pass along data to each sensor client.'''
     pose = odom.odom.pose.pose
-    x = pose.position.x 
-    y = pose.position.y
-    z = pose.position.z
+    # Report UTM coordinates instead of local ENU so can geo-reference sensors to geoid.
+    frame = 'UTM'
+    x = odom.easting #pose.position.x 
+    y = odom.northing #pose.position.y
+    z = odom.altitude #pose.position.z
+    zone = odom.utm_zone
     utc_time = odom.time
     quat = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
     euler = tf.transformations.euler_from_quaternion(quat)
+    rotation_frame = 'ENU'
+    rotation_type = 'FixedXYZ'
     roll = euler[0]
     pitch = euler[1]
     yaw = euler[2]
     for client in clients:
         try:
-            client.send_time_position_and_orientation(utc_time, x, y, z, roll, pitch, yaw)
+            client.send_position(utc_time, frame, x, y, z, zone)
+            client.send_orientation(utc_time, rotation_frame, rotation_type, roll, pitch, yaw)
         except socket.error:
             rospy.logerr('Socket error: client could not send time/position information. Trying to reconnect to {0}'.format(client.address))
             try:
@@ -62,27 +68,27 @@ class SensorControlClient:
     
     def send_time(self, time):
         '''Send time over socket.'''
-        self.sock.sendall("<t,{0}>".format(time))
+        self.sock.sendall("<t,{}>".format(time))
         
-    def send_time_and_position(self, time, x, y, z):
-        '''Send both time and position at same time.'''
-        self.sock.sendall("<tp,{0},{1},{2},{3}>".format(time, x, y, z))
+    def send_position(self, time, frame, x, y, z, zone=None):
+        '''Send time and position in the specified frame.'''
+        self.sock.sendall("<p,{},{},{},{},{},{}>".format(time, frame, x, y, z, zone))
         
-    def send_time_position_and_orientation(self, time, x, y, z, angle1, angle2, angle3):
-        '''Send time, position and orientation at same time.'''
-        self.sock.sendall("<tpo,{0},{1},{2},{3},{4},{5},{6}>".format(time, x, y, z, angle1, angle2, angle3))
+    def send_orientation(self, time, frame, rotation_type, r1, r2, r3, r4=0):
+        '''Send time and orientation in the specified frame.'''
+        self.sock.sendall("<o,{},{},{},{},{},{},{}>".format(time, frame, rotation_type, r1, r2, r3, r4))
         
     def send_command_by_type(self, sensor_type, command):
         '''Send command to all sensors of specified type.'''
-        self.sock.sendall("<ct,{0},{1}>".format(sensor_type, command))
+        self.sock.sendall("<ct,{},{}>".format(sensor_type, command))
         
     def send_command_by_name(self, sensor_name, command):
         '''Send command to all sensors with matching name (names aren't unique)'''
-        self.sock.sendall("<cn,{0},{1}>".format(sensor_name, command))
+        self.sock.sendall("<cn,{},{}>".format(sensor_name, command))
         
     def send_command_by_id(self, sensor_id, command):
         '''Send command to sensor with matching ID. All ID's are unique.'''
-        self.sock.sendall("<ci,{0},{1}>".format(sensor_id, command))
+        self.sock.sendall("<ci,{},{}>".format(sensor_id, command))
 
 if __name__ == '__main__':
     
