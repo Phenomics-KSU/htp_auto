@@ -31,64 +31,41 @@ def odom_callback(odom):
             client.send_position(utc_time, frame, x, y, z, zone)
             client.send_orientation(utc_time, rotation_frame, rotation_type, roll, pitch, yaw)
         except socket.error:
-            rospy.logerr('Socket error: client could not send time/position information. Trying to reconnect to {0}'.format(client.address))
-            try:
-                client.reconnect()
-            except socket.error, e:
-                rospy.logerr('Error reconnecting: {0}'.format(e))
+            rospy.logerr('Socket error - Address: {} Message: {}'.format(client.address, e))
 
 class SensorControlClient:
-    '''Basic TCP client that allows client to send time, position and commands to sensors.'''
+    '''Basic UDP client that allows client to send time, position and commands to sensors.
+    
+        There is no connect() call since UDP has no connections.'''
     
     def __init__(self, host, port):
-        # SOCK_STREAM is the socket type to use for TCP sockets
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # SOCK_DGRAM is the socket type to use for UDP sockets
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.address = (host, port)
-        
-    def connect(self):
-        '''Connect to server.'''
-        self.sock.connect(self.address)
-    
-    def reconnect(self):
-        '''Create new socket (cannot reuse old one) and connect to it.'''
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connect()
-    
-    def close(self):
-        '''Disconnect from server.'''
-        self.sock.close()
-        
-    def is_connected(self):
-        '''Return true if connected.  Check by trying to send data over connection.'''
-        try:
-            self.sock.send('?')
-            return True
-        except socket.error:
-            return False
     
     def send_time(self, time):
         '''Send time over socket.'''
-        self.sock.sendall("<t,{}>".format(time))
-        
+        self.sock.sendto("t,{}\n".format(time), self.address)
+
     def send_position(self, time, frame, x, y, z, zone=None):
         '''Send time and position in the specified frame.'''
-        self.sock.sendall("<p,{},{},{},{},{},{}>".format(time, frame, x, y, z, zone))
+        self.sock.sendto("p,{},{},{},{},{},{}\n".format(time, frame, x, y, z, zone), self.address)
         
     def send_orientation(self, time, frame, rotation_type, r1, r2, r3, r4=0):
         '''Send time and orientation in the specified frame.'''
-        self.sock.sendall("<o,{},{},{},{},{},{},{}>".format(time, frame, rotation_type, r1, r2, r3, r4))
+        self.sock.sendto("o,{},{},{},{},{},{},{}\n".format(time, frame, rotation_type, r1, r2, r3, r4), self.address)
         
     def send_command_by_type(self, sensor_type, command):
         '''Send command to all sensors of specified type.'''
-        self.sock.sendall("<ct,{},{}>".format(sensor_type, command))
+        self.sock.sendto("ct,{},{}\n".format(sensor_type, command), self.address)
         
     def send_command_by_name(self, sensor_name, command):
         '''Send command to all sensors with matching name (names aren't unique)'''
-        self.sock.sendall("<cn,{},{}>".format(sensor_name, command))
+        self.sock.sendto("cn,{},{}\n".format(sensor_name, command), self.address)
         
     def send_command_by_id(self, sensor_id, command):
         '''Send command to sensor with matching ID. All ID's are unique.'''
-        self.sock.sendall("<ci,{},{}>".format(sensor_id, command))
+        self.sock.sendto("ci,{},{}\n".format(sensor_id, command), self.address)
 
 if __name__ == '__main__':
     
@@ -124,16 +101,14 @@ if __name__ == '__main__':
         # Now that things are paired insert default host at beginning of list.
         hosts.insert(0, (default_server_host, default_server_port))
         
+        
+    # Connect a client to each host.
     clients = []
     for host in hosts:
         host_name = host[0]
         port = int(host[1])
-        rospy.loginfo('Connecting to server at {0}:{1}'.format(host_name, port))
+        rospy.loginfo('Creating client for {0}:{1}'.format(host_name, port))
         client = SensorControlClient(host_name, port)
-        try:
-            client.connect()
-        except socket.error, e:
-            rospy.logerr('Error connecting to server: {0}'.format(e))
         clients.append(client)
         
     if clients is None:
