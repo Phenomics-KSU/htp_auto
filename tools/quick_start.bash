@@ -89,9 +89,9 @@ do
         cvt)
 		    exec_command "cd ~/ros/src/htp_auto/tools/"
 		    sleep .2
-            exec_command "python bag2mission.py --help"
+            exec_command "python log2mission.py --help"
             sleep 1
-            type_command "python bag2mission.py ~/bags/your_file.bag ~/missions/your_file.mission"
+            type_command "python log2mission.py ~/bags/your_file.bag ~/missions/your_file.mission"
         ;;
 	    rqt)
             exec_command "export ROS_MASTER_URI=http://${husky_ip}:11311"

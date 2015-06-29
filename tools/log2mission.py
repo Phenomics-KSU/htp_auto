@@ -11,7 +11,19 @@ import os
 import math
 import argparse
 import rosbag
-from __builtin__ import True
+from nmea_parser import parse_nmea_sentence
+
+class TimeStampedPosition(object):
+
+    def __init__(self, time, x, y, z):
+        self.time = time
+        self.x = x 
+        self.y = y
+        self.z = z
+        
+    @property
+    def position(self):
+        return (x, y, z)
 
 # ------------------------------------------------------
 # Helper classes/functions for split and merge algorithm
@@ -79,12 +91,58 @@ def extractHomePositionsFromBag(bag_file_path, home_topic):
         lon = msg.longitude
         alt = msg.altitude
         source = msg.source 
-        home_positions.append([lat, lon, alt, source])
+        home_positions.append((lat, lon, alt, source))
         
     bag.close()
     
     return home_positions
 
+def extractLLAFromNmeaLog(log_file_path):
+    '''Returns lat/long/altitude positions from specified NMEA log file.'''
+    positions = []    
+    with open(log_file_path) as log_file:
+        for line in log_file.readlines():
+            nmea_string = line.strip()
+
+            if not check_nmea_checksum(nmea_string):
+                print "Received a sentence with an invalid checksum. Sentence was: {}".format(nmea_string)
+                continue
+            
+            parsed_sentence = parse_nmea_sentence(nmea_string)
+            if not parsed_sentence:
+                print "Failed to parse NMEA sentence {}".format(nmea_string)
+                continue
+            
+            if 'GGA' in parsed_sentence:
+                data = parsed_sentence['GGA']
+                altitude = data['altitude'] # Altitude is above ellipsoid
+            elif 'GGK' in parsed_sentence:
+                data = parsed_sentence['GGK']
+                # Strip off EHT prefix and convert to float
+                try:
+                    altitude = data['height_above_ellipsoid']
+                    altitude = float(altitude[3:])
+                except ValueError:
+                    altitude = 0
+            else:
+                continue # not a supported position message 
+
+            # common between position message types
+            latitude = data['latitude']
+            if data['latitude_direction'] == 'S':
+                latitude = -latitude
+            longitude = data['longitude']
+            if data['longitude_direction'] == 'W':
+                longitude = -longitude 
+            utc_time = data['utc_time']
+            if math.isnan(utc_time):
+                print 'Invalid UTC time: {}'.format(utc_time)
+                continue
+                
+            positions.append(TimeStampedPosition(utc_time, latitude, longitude, altitude))
+     
+    return positions
+    
 def simplifyPositions(positions, epsilon):
     '''Uses first two elements of positions to run split and merge. 
         Returns same format as input positions but simplified.  
@@ -169,7 +227,7 @@ def convertPositionsToMissionItems(positions, radius, go):
 
 def chooseHomePosition(home_positions):
     
-    if len(home_positions) == 0:
+    if home_positsions is None or len(home_positions) == 0:
         print '\nWarning: no home position found to include in mission.'
         return None
 
@@ -222,46 +280,79 @@ def writeMissionItemsToFile(mission_items, output_file_path):
 
     return
 
-def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius, go):
+def convertLogs(log_paths):
     '''Main function to simplify logged position data and write as waypoints to mission file.'''
+    all_positions = []
+    for log_path in log_paths:
+        print 'Processing file: ' + os.path.splitext(log_path)[0]
+        lla_positions = extractLLAFromNmeaLog(log_path)
+ 
+        if len(positions) == 0:
+            print 'No positions found in file.'''
+        else:
+            print 'Extracted {} positions.'.format(len(positions))
+            all_positions.extend(positions)
+    
+    if len(all_positions) == 0:
+        print 'No positions to process.'
+        return None, None
+    
+    if len(log_paths) > 1:
+        print 'Extracted {} positions from {} files.'.format(len(all_positions), len(log_paths)) 
+        
+    print 'Sorting positions by time stamp.'''
+    lla_positions = sorted(lla_positions, key=lambda item: item.time)
+    
+    home_lat, home_lon, home_alt = lla_positions[0].position
+    home_position = [(home_lat, home_lon, home_alt, 'First Item')]
+
+    
+    
+    return positions, home_position
+
+def convertBag(bag_path, position_topic, home_topic):
+    '''Main function to simplify logged position data and write as waypoints to mission file.'''
+    print 'Processing ' + bag_path
+    
     positions = extractPositionsFromBag(bag_path, position_topic)
     
     if len(positions) == 0:
-        print '\nNo position messages found in bag using topic \'{0}\''.format(position_topic)
-        return False
-    
-    print '\nExtracted {0} position messages.'.format(len(positions))
-            
-    positions = simplifyPositions(positions, epsilon)
-    
-    print 'Simplified down to {0} positions.'.format(len(positions))
-            
-    mission_items = convertPositionsToMissionItems(positions, radius, go)
-    
-    if len(mission_items) == 0:
-        print '\nError during conversion.'
-        return False
-    
-    print 'Converted all positions to waypoints.'
-    
+        print '\nNo position messages found in bag using topic \'{}\''.format(position_topic)
+        return None, None
+   
     home_positions = extractHomePositionsFromBag(bag_path, home_topic)
 
-    home_position = chooseHomePosition(home_positions)
-    if home_position is not None:
-        set_home_command = convertHomeToSetCommand(home_position)
-        mission_items.insert(0, set_home_command)
+    return positions, home_positions
     
-    writeMissionItemsToFile(mission_items, output_path)
-    
-    print 'Wrote mission file: {0}'.format(output_path)
-    print ''
-    
-    return True # Successful
-
+def getLogFiles(input):
+    '''Returns list of filepaths to valid log files.  'input' argument is either a log filepath or a directory containing logs.'''
+    log_filepaths = []
+    extensions = ['bag', 'csv', 'log', 'cap']
+    if os.path.isdir(input):
+        for fname in os.listdir(input):
+            extension = os.path.splitext(fname)[1][1:]
+            if extension.lower() in extensions:
+                if extension == 'bag':
+                    print 'Skipping file {} since its a bag.  Only logs can be processed in groups.'.format(fname)
+                else:
+                    log_filenames.append(os.path.join(input, fname))
+            else:
+                print 'Skipping file {} due to unsupported extension'.format(fname)
+    elif os.path.exits(input): # must be a valid file path
+        extension = os.path.splitext(fname)[1][1:]
+        if extension in extensions:
+            log_filepaths.append(input)
+        else:
+            print 'File {} exists, but does not have one of the supported extensions {}'.format(input, extensions)
+    else:
+        print '{} does not exists.'
+        
+    return log_filepaths
+     
 if __name__ == '__main__':
     
-    parser = argparse.ArgumentParser(description='Convert position messages in bag file to mission file.')
-    parser.add_argument('bag_file', help='path to bag file to convert')
+    parser = argparse.ArgumentParser(description='Convert position messages in log or bag file(s) to mission file.')
+    parser.add_argument('input', help='either path to log/bag file to convert or if a directory then uses all logs/bags found inside.')
     parser.add_argument('output_file', help='path to mission file to create')
     parser.add_argument('-p', dest='position_topic', default='/robot_pose_ekf/odom_combined', help='Name of topic to extract position from.')
     parser.add_argument('-t', dest='home_topic', default='/home', help='Name of topic to extract home position from.')
@@ -270,7 +361,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', dest='go', default='false', help='If \'true\' then will only stop at first and last waypoints')
     args = parser.parse_args()
     
-    bag_path = args.bag_file
+    input = args.input
     output_path = args.output_file
     position_topic = args.position_topic
     home_topic = args.home_topic
@@ -283,11 +374,42 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
         
-    success = convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius, go)
+    log_filepaths = getLogFiles(input)
+        
+    if len(log_filepaths) == 0:
+        print 'No files to process.  Exiting.'
+        sys.exit(1)
+                   
+    if os.path.splitext(log_filepaths[0])[1][1:] == 'bag':
+        bag_filepath = log_filepaths[0]
+        positions, home_positions = convertBag(bag_filepath, position_topic, home_topic)
+    else:
+        positions, home_positions = convertLogs(log_filepaths)
+    
+    if positions is None or len(positions) == 0:
+        sys.exit(1)
+        
+    positions = simplifyPositions(positions, epsilon)
+    
+    print 'Simplified down to {} positions.'.format(len(positions))
+            
+    mission_items = convertPositionsToMissionItems(positions, radius, go)
+    
+    if len(mission_items) == 0:
+        print '\nError during conversion.'
+        return sys.exit(1)
+    
+    print 'Converted all positions to waypoints.'
+
+    home_position = chooseHomePosition(home_positions)
+    if home_position is not None:
+        set_home_command = convertHomeToSetCommand(home_position)
+        mission_items.insert(0, set_home_command)
+        
+    writeMissionItemsToFile(mission_items, output_path)
+    
+    print 'Wrote mission file: {}'.format(output_path)
+    print ''
         
     if success: 
         print 'Success\n'
-        sys.exit(0)
-    else:
-        sys.exit(1)
-    
