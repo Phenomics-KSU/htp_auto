@@ -217,14 +217,32 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     // Take into account the fact the robot is in between the two antennas and the
     // reported lat/lon is only for the primary receiver (which we mount on the right)
     double ant1_offset = message.range / 2.0; // antenna 1 offset in meters
-    enu[0] += -sin(corrected_yaw) * ant1_offset; // easting
-    enu[1] += cos(corrected_yaw) * ant1_offset;  // northing
+    double east_antenna_offset = -sin(corrected_yaw) * ant1_offset;
+    double north_antenna_offset = cos(corrected_yaw) * ant1_offset;
+
+    // Add in antenna offset to local and UTM coordinates so they both represent same point.
+    enu[0] += east_antenna_offset;
+    enu[1] += north_antenna_offset;
+    easting += east_antenna_offset;
+    northing += north_antenna_offset;
 
     //ROS_INFO_STREAM_THROTTLE(1, "ENU: " << enu[0] << ", " << enu[1] << ", " << enu[2]);
 
     // Project measured position to be center of rotation.
-    enu[0] += cos(corrected_yaw) * distance_to_center_of_rotation;
-    enu[1] += sin(corrected_yaw) * distance_to_center_of_rotation;
+    double east_projection_offset = cos(corrected_yaw) * distance_to_center_of_rotation;
+    double north_projection_offset = sin(corrected_yaw) * distance_to_center_of_rotation;
+
+    // Add in project distance to local and UTM coordinates so they both represent same point.
+    enu[0] += east_projection_offset;
+    enu[1] += north_projection_offset;
+    easting += east_projection_offset;
+    northing += north_projection_offset;
+
+    // Find altitude of center of antennas.  We don't know pitch so hopefully this is close enough to center of rotation.
+    double tilt_rad = message.tilt_deg * deg2rad;
+    double altitude_offset = sin(tilt_rad) * message.range / 2.0;
+    enu[2] -= altitude_offset;
+    last_fix.altitude -= altitude_offset;
 
     // TODO: handle this better or stop using UTM
     if (zone != utm_home_zone)
@@ -241,7 +259,7 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     odom.pose.pose.position.z = enu[2];
 
     // Convert yaw to quaternion before storing in message.
-    tf::Quaternion corrected_quat = tf::createQuaternionFromRPY(0, 0, corrected_yaw);
+    tf::Quaternion corrected_quat = tf::createQuaternionFromRPY(tilt_rad, 0, corrected_yaw);
     odom.pose.pose.orientation.x = corrected_quat.getX();
     odom.pose.pose.orientation.y = corrected_quat.getY();
     odom.pose.pose.orientation.z = corrected_quat.getZ();
