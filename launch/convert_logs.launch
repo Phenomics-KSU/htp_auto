@@ -1,0 +1,17 @@
+<launch>
+
+    <arg name="directory" default="none"/>
+    
+    <node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="gps_driver">
+        <param name="port" value="$(arg port)"/>
+        <param name="baud" value="$(arg baud)"/>
+        <param name="test_file" value="$(arg test_file)"/>
+    </node>
+
+    <node pkg="htp_auto" type="gps_converter" name="gps_converter"> </node>
+    
+    <node pkg="htp_auto" type="sensor_control_client.py" name="sensor_control_client">
+        <param name="sensor_hosts" value="$(arg sensor_hosts)"/>
+    </node>
+
+</launch>

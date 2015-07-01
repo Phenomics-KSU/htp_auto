@@ -24,7 +24,7 @@ def odom_callback(odom):
     rotation_frame = 'ENU'
     rotation_type = 'FixedXYZ'
     roll = euler[0]
-    pitch = euler[1]
+    pitch = 'nan' # euler[1] pitch isn't being measured so don't want to store it as 0 in database.
     yaw = euler[2]
     for client in clients:
         try:

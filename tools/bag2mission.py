@@ -59,10 +59,20 @@ def extractPositionsFromBag(bag_file_path, position_topic):
     bag = rosbag.Bag(bag_file_path)
 
     positions = []    
+    last_utc_time = 0
     for topic, msg, t in bag.read_messages(topics=[position_topic]):
-        x = msg.pose.pose.position.x
-        y = msg.pose.pose.position.y
-        z = msg.pose.pose.position.z
+        try:
+            position = msg.pose.pose.position
+        except AttributeError:
+            position = msg.odom.pose.pose.position
+            utc_time = msg.time
+            if utc_time - last_utc_time < 0:
+                print 'WARNING MESSAGES NOT SORTED IN ORDER BY UTC TIME'
+            last_utc_time = utc_time
+        
+        x = position.x
+        y = position.y
+        z = position.z
         positions.append([x, y, z])
         
     bag.close()
