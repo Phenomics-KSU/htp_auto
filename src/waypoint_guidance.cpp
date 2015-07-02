@@ -27,6 +27,10 @@
 // HTP Package Headers
 #include "pid.h"
 
+// Conversion constants
+const double rad2deg = 180.0 / M_PI;
+const double deg2rad = M_PI / 180.0;
+
 /**
  * Tracks a target in two dimensions.  Allows user to set a desired (x,y) position and provides 'update()' method
  * to calculate forward linear and angular velocities for a differential drive robot.
@@ -97,7 +101,8 @@ public: // methods
         last_turning_check_heading_(0),
         stopped_turning_(false),
         last_driving_check_time_(0),
-        stopped_driving_(false)
+        stopped_driving_(false),
+        max_heading_error_before_stopping_(1.5707) // 90 degrees
     {
         for (int i = 0; i < 2; ++i)
         {
@@ -247,6 +252,7 @@ public: // methods
         travel_velocity_ = config.travel_vel;
         in_line_following_mode_ = config.line_following_mode;
         control_projection_distance_ = config.projection_distance;
+        max_heading_error_before_stopping_ = config.max_heading_error_deg * deg2rad;
         heading_pid_.set_kp(config.heading_kp);
         heading_pid_.set_ki(config.heading_ki);
         heading_pid_.set_kd(config.heading_kd);
@@ -335,6 +341,15 @@ private: // methods
     bool travel(double const * current_position, double heading, double & linear_velocity, double & angular_velocity)
     {
         bool reached_target = false;
+
+        double heading_error = bearing_ - heading;
+        if (fabs(heading_error) > max_heading_error_before_stopping_)
+        {
+            // Not looking close enough at target so stop and get re-oriented.
+            // Don't set velocities so they get zeroed out.
+            updateState(facing_target);
+            return false; // haven't reached target
+        }
     
         if (!in_line_following_mode_)
         {
@@ -671,6 +686,8 @@ private: // fields
     // Becomes true if vehicle stops physical moving forward after being in a state for a couple seconds.
     double stopped_driving_;
 
+    // Maximum heading error (in radians) when traveling to target to start vehicle and re-face target.
+    double max_heading_error_before_stopping_;
 };
 
 
