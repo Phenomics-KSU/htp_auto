@@ -768,7 +768,8 @@ public: // methods
         // Reset flag so we don't instantly complete goal.
         reached_target_ = false;
     
-        ROS_INFO_STREAM(std::setprecision(2) << std::fixed << action_name_ << ": Going to (" << goal->target_x << ", " << goal->target_y << ")");
+        int target_index = goal->target_index;
+        ROS_INFO_STREAM(std::setprecision(3) << std::fixed << action_name_ << ": Going to target index " << target_index << " at (" << goal->target_x << ", " << goal->target_y << ")");
 
         // Start timer to check for goal cancellation and send feedback to client.
         goal_periodic_timer_.start();

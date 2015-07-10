@@ -1,6 +1,7 @@
 # goal in same frame as measured position.
-float64 target_x
-float64 target_y
+int32 target_index # index of item within mission
+float64 target_x # meters
+float64 target_y # meters
 float64 acceptance_radius # meters
 bool stop_at_target
 ---

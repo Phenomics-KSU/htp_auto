@@ -291,6 +291,7 @@ private: // methods
         }
 
         WaypointGuidanceGoal goal;
+        goal.target_index = current_index_;
         goal.target_x = x;
         goal.target_y = y;
         goal.acceptance_radius = item.param4;
