@@ -172,6 +172,34 @@ public: // methods
             new_index = items_.size();
         }
 
+        // Make sure that if a 'set home' item came before the item
+        // that's being set then the home position is updated because otherwise
+        // when the mission is started everything will be off.
+        if ((new_index > 0) && (items_.size() > 0))
+        {
+            bool found_set_home_item = false;
+            uint32_t set_home_item_index = 0;
+            // At this point new index can never be greater than number of items.
+            // Don't search through all items since we don't want to set home after item.
+            for (uint32_t i = 0; i < new_index; ++i)
+            {
+                if (items_[i].type == MISSION_ITEM_SET_HOME)
+                {
+                    found_set_home_item = true;
+                    set_home_item_index = i;
+                }
+            }
+            if (found_set_home_item)
+            {
+                ROS_INFO("Executing set home item at index %u in case it was skipped.", set_home_item_index);
+                bool set_home_successful = executeSetHome(items_[set_home_item_index]);
+                if (!set_home_successful)
+                {
+                    ROS_WARN("Failed to set home.");
+                }
+            }
+        } // end of set home checks
+
         current_index_ = new_index;
         ROS_INFO("Set mission index to: %u", new_index);
         return true;
