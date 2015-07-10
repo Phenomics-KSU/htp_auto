@@ -95,7 +95,27 @@ def extractHomePositionsFromBag(bag_file_path, home_topic):
     
     return home_positions
 
-def simplifyPositions(positions, epsilon):
+def distanceBetweenPositionsXY(p1, p2):
+    '''Returns magnitude of distance between two points.'''
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    return math.sqrt(dx*dx + dy*dy)
+
+def simplifyPositionsMinDistance(positions, min_distance):
+    '''Return new list of position where the spacing between any two consecutive points is no less than specified distance in XY plane.'''
+    simplified_positions = []
+    
+    for i, position in enumerate(positions):
+        if i == 0:
+            simplified_positions.append(position)
+            continue
+        last_kept_position = simplified_positions[-1]
+        if distanceBetweenPositionsXY(position, last_kept_position) > min_distance:
+            simplified_positions.append(position)
+        
+    return simplified_positions
+            
+def simplifyPositionsApprox(positions, epsilon):
     '''Uses first two elements of positions to run split and merge. 
         Returns same format as input positions but simplified.  
         Z component is set to zero.'''
@@ -232,19 +252,24 @@ def writeMissionItemsToFile(mission_items, output_file_path):
 
     return
 
-def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius, go):
+def convertBagToMissionFile(bag_path, output_path, simplify_type, position_topic, home_topic, epsilon, min_distance, radius, go):
     '''Main function to simplify logged position data and write as waypoints to mission file.'''
     positions = extractPositionsFromBag(bag_path, position_topic)
     
     if len(positions) == 0:
-        print '\nNo position messages found in bag using topic \'{0}\''.format(position_topic)
+        print '\nNo position messages found in bag using topic \'{}\''.format(position_topic)
         return False
     
-    print '\nExtracted {0} position messages.'.format(len(positions))
+    print '\nExtracted {} position messages.'.format(len(positions))
             
-    positions = simplifyPositions(positions, epsilon)
+    if simplify_type == 'approx':
+        positions = simplifyPositionsApprox(positions, epsilon)
+    elif simplify_type == 'distance':
+        positions = simplifyPositionsMinDistance(positions, min_distance)
+    else:
+        print 'Warning: invalid method ' + simplify_type
     
-    print 'Simplified down to {0} positions.'.format(len(positions))
+    print 'Simplified down to {} positions using {} method.'.format(len(positions), simplify_type)
             
     mission_items = convertPositionsToMissionItems(positions, radius, go)
     
@@ -270,21 +295,34 @@ def convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, e
 
 if __name__ == '__main__':
     
+    simplify_types = ['approx', 'distance']
+    default_simplify_type = simplify_types[0]
+    default_epsilon = .1
+    default_distance = 1 # meters
+    default_radius = .5 # meters
+    default_home_topic = '/home'
+    default_pos_topic = '/gps'
+    default_go = 'false'
+    
     parser = argparse.ArgumentParser(description='Convert position messages in bag file to mission file.')
     parser.add_argument('bag_file', help='path to bag file to convert')
     parser.add_argument('output_file', help='path to mission file to create')
-    parser.add_argument('-p', dest='position_topic', default='/robot_pose_ekf/odom_combined', help='Name of topic to extract position from.')
-    parser.add_argument('-t', dest='home_topic', default='/home', help='Name of topic to extract home position from.')
-    parser.add_argument('-e', dest='epsilon', default=.2, help='Split threshold in meters. Smaller = more waypoints. Must be greater than 0')
-    parser.add_argument('-a', dest='radius', default=.5, help='Acceptance radius of every waypoint.')
-    parser.add_argument('-g', dest='go', default='false', help='If \'true\' then will only stop at first and last waypoints')
+    parser.add_argument('-s', dest='simplify_type', default=default_simplify_type, help='How to simplify points. Options are {}. Approx is a deviation from path and distance deletes points to maintain spacing. Default is {}'.format(simplify_types, default_simplify_type))
+    parser.add_argument('-p', dest='position_topic', default=default_pos_topic, help='Name of topic to extract position from. Default {}'.format(default_pos_topic))
+    parser.add_argument('-t', dest='home_topic', default=default_home_topic, help='Name of topic to extract home position from. Default {}'.format(default_home_topic))
+    parser.add_argument('-e', dest='epsilon', default=default_epsilon, help='Split threshold in meters. Smaller = more waypoints. Must be greater than 0. Default {}'.format(default_epsilon))
+    parser.add_argument('-d', dest='min_distance', default=default_distance, help='Minimum waypoint spacing when using distance type. Default {}'.format(default_distance))
+    parser.add_argument('-a', dest='radius', default=default_radius, help='Acceptance radius of every waypoint. Default {}'.format(default_radius))
+    parser.add_argument('-g', dest='go', default=default_go, help='If \'true\' then will only stop at first and last waypoints. Default {}'.format(default_go))
     args = parser.parse_args()
     
     bag_path = args.bag_file
     output_path = args.output_file
+    simplify_type = args.simplify_type.lower()
     position_topic = args.position_topic
     home_topic = args.home_topic
     epsilon = float(args.epsilon)
+    min_distance = float(args.min_distance)
     radius = float(args.radius)
     go = args.go.lower() == 'true'; 
     
@@ -293,7 +331,11 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
         
-    success = convertBagToMissionFile(bag_path, output_path, position_topic, home_topic, epsilon, radius, go)
+    if simplify_type not in simplify_types:
+        print '\nError: simplify type {} not one of options {}'.format(simplify_type, simplify_types)
+        sys.exit(1)
+        
+    success = convertBagToMissionFile(bag_path, output_path, simplify_type, position_topic, home_topic, epsilon, min_distance, radius, go)
         
     if success: 
         print 'Success\n'
