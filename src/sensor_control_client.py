@@ -9,6 +9,8 @@ import tf
 
 from htp_auto.msg import OdometryUTC
 
+debug_count_ = 0
+
 def odom_callback(odom):
     '''Subscriber callback for odometery message. Pass along data to each sensor client.'''
     pose = odom.odom.pose.pose
@@ -26,6 +28,15 @@ def odom_callback(odom):
     roll = euler[0]
     pitch = 'nan' # euler[1] pitch isn't being measured so don't want to store it as 0 in database.
     yaw = euler[2]
+    
+    # Calculate amount of time that has elapsed since first reading in GPS message and now.
+    processing_duration = rospy.get_rostime() - odom.odom.header.stamp
+    processing_seconds = processing_duration.to_sec()
+    
+    debug_count_ += 1
+    if debug_count_ % 20 == 0:
+        rospy.loginfo('Merge: {}  Processing: {}'.format(odom.merge_time_diff, processing_seconds))
+    
     for client in clients:
         try:
             client.send_position(utc_time, frame, x, y, z, zone)
@@ -101,7 +112,6 @@ if __name__ == '__main__':
         # Now that things are paired insert default host at beginning of list.
         hosts.insert(0, (default_server_host, default_server_port))
         
-        
     # Connect a client to each host.
     clients = []
     for host in hosts:
@@ -115,6 +125,7 @@ if __name__ == '__main__':
         rospy.logwarn('No clients to connect to.  Exiting sensor control client.')
         sys.exit(0)
         
-    rospy.Subscriber("gps_utc", OdometryUTC, odom_callback, queue_size = 50)
+    # Keep buffer size at 1 to avoid buffering old messages.
+    rospy.Subscriber("gps_utc", OdometryUTC, odom_callback, queue_size = 1)
     
     rospy.spin()                               

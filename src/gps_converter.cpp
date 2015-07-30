@@ -121,6 +121,14 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     // Save this so we know for next time.
     last_used_fix_time = last_fix.header.stamp;
 
+    // Make sure that there isn't a large time difference between the messages.
+    double utc_difference = message.utc_time - last_fix.utc_time;
+    if (fabs(utc_difference) > 0.2)
+    {
+        ROS_WARN_STREAM_THROTTLE(1, "Large utc difference between AVR and GGK: " << utc_difference);
+        return;
+    }
+
     // If don't have good enough fix then don't want to publish odom message.
     // For yaw quality indicator:
     //  0: Fix not available or invalid
@@ -327,6 +335,7 @@ void AVRMessageReceived(const nmea_navsat_driver::AVR & message)
     htp_auto::OdometryUTC odom_utc;
     odom_utc.odom = odom;
     odom_utc.time = message.utc_time;
+    odom_utc.merge_time_diff = utc_difference;
     odom_utc.easting = easting;
     odom_utc.northing = northing;
     odom_utc.altitude = last_fix.altitude;
@@ -402,12 +411,14 @@ int main(int argc, char **argv)
     // Establish this program as a node. This is what actually connects to master.
     ros::NodeHandle nh;
 
+    // Keep buffer size at 1 to avoid buffering up old messages.
     ros::Subscriber avr_sub = nh.subscribe("avr", 1, AVRMessageReceived);
     ros::Subscriber ggk_sub = nh.subscribe("ggk", 1, GGKMessageReceived);
 
+    odom_pub = nh.advertise<nav_msgs::Odometry>("gps", 1);
+    odom_utc_pub = nh.advertise<htp_auto::OdometryUTC>("gps_utc", 1);
+
     // Home publisher needs to be latched so log file can store it.
-    odom_pub = nh.advertise<nav_msgs::Odometry>("gps", 5);
-    odom_utc_pub = nh.advertise<htp_auto::OdometryUTC>("gps_utc", 5);
     home_pub = nh.advertise<htp_auto::Home>("home", 1, /*latched*/true);
 
     // Setup reconfigure server to allow for parameter updates.
