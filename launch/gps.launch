@@ -1,7 +1,7 @@
 <launch>
 
     <arg name="port" default="/dev/ttyS0"/>
-    <arg name="baud" default="38400"/>
+    <arg name="baud" default="115200"/>
     <arg name="test_file" default=""/>
     <arg name="sensor_hosts" default="none"/>
     
@@ -18,5 +18,7 @@
     <node pkg="htp_auto" type="sensor_control_client.py" name="sensor_control_client">
         <param name="sensor_hosts" value="$(arg sensor_hosts)"/>
     </node>
+
+    <node name="gps_utc_throttler" type="throttle" pkg="topic_tools" args="messages /gps_utc 20 /gps_utc_throttled" />
 
 </launch>

@@ -4,7 +4,7 @@
            args="record --split --size 2000 -o output
             /avr
             /ggk
-            /gps_utc
+            /gps_utc_throttled
             /husky/data/system_status
             /rosout
             "/>

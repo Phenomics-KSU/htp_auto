@@ -25,7 +25,7 @@ def getBagTopicsAndTypes(bag):
 def extractMessagesFromBag(bag, topic):
     '''Returns list of all messages in specified topic from bag.'''
     
-    if topic != '/gps_utc':
+    if topic not in ['/gps_utc', '/gps_utc_throttled']:
         print "Only supports /gps_utc topic right now. Exiting."
         sys.exit(1)
     
