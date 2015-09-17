@@ -169,6 +169,7 @@ target_link_libraries(log_converter
 ## in contrast to setup.py, you can choose the destination
 install(PROGRAMS
    src/sensor_control_client.py
+   src/teleop.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
