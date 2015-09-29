@@ -3,7 +3,7 @@
     <arg name="port" default="/dev/ttyS0"/>
     <arg name="baud" default="115200"/>
     <arg name="test_file" default=""/>
-    <arg name="sh" default="hostname"/> # sensor host
+    <arg name="sh" default="0.0.0.0"/> # sensor host
     <arg name="sp" default="50005"/> # sensor port
     
     <include file="$(find htp_auto)/launch/record.launch" />

@@ -284,7 +284,7 @@ if __name__ == '__main__':
     
     rospy.init_node('gps_server')
 
-    host = rospy.get_param('~sh', "hostname")
+    host = rospy.get_param('~sh', "0.0.0.0")
     server_port = rospy.get_param('~sp', 50005)
 
     if host == 'hostname':
