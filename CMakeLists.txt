@@ -15,6 +15,7 @@ find_package(catkin REQUIRED
   nav_msgs
   tf
   dynamic_reconfigure
+  serial
 )
 
 
@@ -94,9 +95,9 @@ generate_dynamic_reconfigure_options(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include src/glo_link/inc src/globs/
 #  LIBRARIES htp_auto
-  CATKIN_DEPENDS message_runtime actionlib_msgs
+  CATKIN_DEPENDS message_runtime actionlib_msgs serial
 #  DEPENDS system_lib
 )
 
@@ -106,7 +107,11 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(include)
+include_directories(
+    include
+    src/glo_link/inc
+    src/globs
+)
 
 ## Declare a cpp library
 # add_library(htp_auto
@@ -120,6 +125,7 @@ add_executable(mission_loader src/mission_loader.cpp)
 add_executable(quat_to_euler src/quat_to_euler.cpp)
 add_executable(gps_converter src/gps_converter.cpp src/coordinate_conversions.cpp)
 add_executable(log_converter src/log_converter.cpp src/coordinate_conversions.cpp)
+add_executable(glo_link src/glo_link.cpp src/glo_link/glo_tx_link.cpp src/glo_link/glo_rx_link.cpp src/glo_link/crc.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -132,6 +138,8 @@ add_dependencies(gps_converter htp_auto_generate_messages_cpp)
 add_dependencies(gps_converter {PROJECT_NAME}_gencfg)
 add_dependencies(log_converter htp_auto_generate_messages_cpp)
 add_dependencies(log_converter {PROJECT_NAME}_gencfg)
+add_dependencies(glo_link htp_auto_generate_messages_cpp)
+add_dependencies(glo_link {PROJECT_NAME}_gencfg)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(waypoint_guidance
@@ -155,6 +163,10 @@ target_link_libraries(gps_converter
 )
 
 target_link_libraries(log_converter
+   ${catkin_LIBRARIES}
+)
+
+target_link_libraries(glo_link
    ${catkin_LIBRARIES}
 )
 

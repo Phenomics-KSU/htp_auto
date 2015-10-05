@@ -1,0 +1,23 @@
+For installing a package on an offline computer:
+http://docs.xubuntu.org/1304/offline-packages.html
+
+(only do step 1 if you don't have apt-offline installed on both computers)
+1) On online computer:
+    a) Install apt-offline on the online computer with: sudo apt-get install apt-offline
+    b) download .deb from Ubuntu repo http://packages.ubuntu.com/precise/all/apt-offline/download
+        (if not using precise (12.04) change URL)
+
+2) On offline computer:
+    a) Create and navigate to a subdirectory for this package.
+    b) (optional) Copy the .deb to the offline computer and install with: sudo dpkg -i apt-offline_package_file.deb
+    c) Create a signature file with: sudo apt-offline set --install-packages $PACKAGENAME --update apt-offline.sig
+
+3) On online computer:
+    a) Use signature file (apt-offline.sig) to download all everything to a zip directory with:
+        sudo apt-offline get --bundle bundle.zip apt-offline.sig
+        errors that show up about being unable to download files relative to translations can be safely ignored.
+        This will create a bundle.zip file.
+    
+4) On offline computer:
+    a) Copy bundle.zip to offline computer and install updates with: sudo apt-offline install bundle.zip
+    b) Install actual package with sudo apt-get install $PACKAGENAME
