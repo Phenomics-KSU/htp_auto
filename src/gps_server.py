@@ -26,8 +26,9 @@ def odom_callback(odom, server):
     roll = euler[0]
     pitch = 'nan' # euler[1] pitch isn't being measured so don't want to store it as 0 in database.
     yaw = euler[2]
+    # Get system time when gps data was first read in.
     # Use half of merge time since that will estimate an inbetween of when position and orientation were measured.
-    sys_time = rospy.get_time() + (odom.merge_time_diff / 2.0)
+    sys_time = odom.odom.header.stamp.to_sec() + (odom.merge_time_diff / 2.0)
     
     server.new_position(utc_time, sys_time, x, y, z, zone)
     server.new_orientation(utc_time, sys_time, roll, pitch, yaw)
@@ -213,7 +214,7 @@ class ClientHandler(threading.Thread):
         # Calculate time that's elapsed since UTC time was read in.
         sys_time_ref = data[2]
         elapsed_time = rospy.get_time() - sys_time_ref
-                    
+  
         # Replace sys time ref with elapsed times.
         data[2] = elapsed_time
                     
