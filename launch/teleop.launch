@@ -3,7 +3,7 @@
   <arg name="drive_speed" default="1.0" />
   <arg name="turn_speed" default="1.0" />
   <arg name="cruise_max" default="1.0" />
-  <arg name="cruise_change" default="0.01" />
+  <arg name="cruise_change" default="0.05" />
   <arg name="joy_dev" default="/dev/input/js0" />
   <arg name="cmd_topic" default="husky/cmd_vel" />
 
